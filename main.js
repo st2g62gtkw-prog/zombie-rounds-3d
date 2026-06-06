@@ -164,30 +164,15 @@ function initScene() {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  addFloorPatch(0, 0, 11, 11, 0x43483e);
-  addFloorPatch(-14, -13, 8, 8, 0x38453f);
-  addFloorPatch(14, -11, 8, 7, 0x454039);
-  addFloorPatch(0, 15, 13, 6, 0x3d4550);
-
   addWall(0, 1, -25, 50, 2, 1);
   addWall(0, 1, 25, 50, 2, 1);
   addWall(-25, 1, 0, 1, 2, 50);
   addWall(25, 1, 0, 1, 2, 50);
 
-  addObstacle(-7, 1, -4, 4, 2, 2);
-  addObstacle(6, 1, -8, 3, 2, 5);
-  addObstacle(8, 1, 6, 5, 2, 2);
-  addObstacle(-9, 1, 9, 3, 2, 4);
-  addObstacle(-13.5, 1, -13, 5, 2, 2);
-  addObstacle(-14, 1, -10, 5, 2, 1.2);
-  addObstacle(14, 1, -11, 4, 2, 1.4);
-  addObstacle(16, 1, -6, 1.4, 2, 4);
-  addObstacle(-16, 1, 2, 1.4, 2, 5);
-  addObstacle(-13, 1, 6, 4, 2, 1.4);
-  addObstacle(-5, 1, 15, 4, 2, 1.4);
-  addObstacle(5, 1, 15, 4, 2, 1.4);
-
-  scene.add(new THREE.GridHelper(50, 50, 0x67705e, 0x30362f));
+  addObstacle(-13.5, 1, -11.8, 6, 2, 5.6);
+  addObstacle(13.5, 1, -10, 6, 2, 5);
+  addObstacle(-13.5, 1, 10, 6, 2, 5);
+  addObstacle(12.5, 1, 12, 6, 2, 5);
 }
 
 function addWall(x, y, z, width, height, depth) {
@@ -212,17 +197,6 @@ function addObstacle(x, y, z, width, height, depth) {
   obstacle.receiveShadow = true;
   scene.add(obstacle);
   obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
-}
-
-function addFloorPatch(x, z, width, depth, color) {
-  const patch = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, depth),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.95 }),
-  );
-  patch.rotation.x = -Math.PI / 2;
-  patch.position.set(x, 0.015, z);
-  patch.receiveShadow = true;
-  scene.add(patch);
 }
 
 function loadBestScore() {
@@ -379,6 +353,7 @@ function spawnRound(roundNumber) {
       points: type.points,
       speed: type.speed + roundNumber * 0.09,
       lastAttack: 0,
+      avoidSide: Math.random() < 0.5 ? -1 : 1,
     });
   }
 
@@ -554,14 +529,7 @@ function updateEnemies(delta) {
     if (distance > attackRange) {
       const step = Math.min(enemy.speed * delta, distance - attackRange);
       const direction = toPlayer.normalize();
-      const nextX = enemy.mesh.position.clone();
-      const nextZ = enemy.mesh.position.clone();
-      nextX.x += direction.x * step;
-      nextZ.z += direction.z * step;
-
-      // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
-      if (canOccupy(nextX, enemy.radius)) enemy.mesh.position.x = nextX.x;
-      if (canOccupy(nextZ, enemy.radius)) enemy.mesh.position.z = nextZ.z;
+      moveEnemy(enemy, direction, step);
     }
 
     const currentDistance = getHorizontalDistance(enemy.mesh.position, playerPosition);
@@ -571,6 +539,44 @@ function updateEnemies(delta) {
       damagePlayer(10);
     }
   }
+}
+
+function moveEnemy(enemy, direction, step) {
+  const startX = enemy.mesh.position.x;
+  const startZ = enemy.mesh.position.z;
+  const nextX = enemy.mesh.position.clone();
+  const nextZ = enemy.mesh.position.clone();
+
+  nextX.x += direction.x * step;
+  nextZ.z += direction.z * step;
+
+  // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
+  if (canOccupy(nextX, enemy.radius)) enemy.mesh.position.x = nextX.x;
+  if (canOccupy(nextZ, enemy.radius)) enemy.mesh.position.z = nextZ.z;
+
+  const moved = Math.hypot(enemy.mesh.position.x - startX, enemy.mesh.position.z - startZ);
+  if (moved > step * 0.25) return;
+
+  const side = new THREE.Vector3(-direction.z * enemy.avoidSide, 0, direction.x * enemy.avoidSide);
+  const sideStep = step * 0.9;
+
+  if (tryMoveEnemySideways(enemy, side, sideStep)) return;
+
+  enemy.avoidSide *= -1;
+  side.multiplyScalar(-1);
+  tryMoveEnemySideways(enemy, side, sideStep);
+}
+
+function tryMoveEnemySideways(enemy, side, step) {
+  const nextPosition = enemy.mesh.position.clone();
+  nextPosition.x += side.x * step;
+  nextPosition.z += side.z * step;
+
+  if (!canOccupy(nextPosition, enemy.radius)) return false;
+
+  enemy.mesh.position.x = nextPosition.x;
+  enemy.mesh.position.z = nextPosition.z;
+  return true;
 }
 
 function damagePlayer(amount) {

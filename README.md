@@ -32,7 +32,7 @@ Al terminar una ronda puede aparecer un power-up. Como maximo hay 2 activos y de
 
 ## Presentacion
 
-El mapa usa zonas de piso, cajas y barreras hechas con geometrias basicas. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
+El mapa usa suelo, muros y pocos obstaculos grandes hechos con geometrias basicas. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
 
 ## Ejecutar localmente
 
