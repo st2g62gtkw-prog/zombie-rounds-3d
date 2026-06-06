@@ -1,0 +1,413 @@
+const THREE = window.THREE;
+
+if (!THREE) {
+  throw new Error("Three.js no se cargo correctamente.");
+}
+
+const canvas = document.querySelector("#gameCanvas");
+const healthValue = document.querySelector("#healthValue");
+const roundValue = document.querySelector("#roundValue");
+const enemyValue = document.querySelector("#enemyValue");
+const scoreValue = document.querySelector("#scoreValue");
+const startMessage = document.querySelector("#startMessage");
+const gameOverMessage = document.querySelector("#gameOverMessage");
+const restartButton = document.querySelector("#restartButton");
+
+const PLAYER_HEIGHT = 1.7;
+const PLAYER_RADIUS = 0.45;
+const ENEMY_RADIUS = 0.42;
+const ARENA_LIMIT = 23;
+const ENEMY_ATTACK_RANGE = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x151a20);
+scene.fog = new THREE.Fog(0x151a20, 20, 58);
+
+const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 100);
+camera.rotation.order = "YXZ";
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  preserveDrawingBuffer: true,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const raycaster = new THREE.Raycaster();
+raycaster.far = 60;
+
+const keys = new Set();
+const clock = new THREE.Clock();
+const playerPosition = new THREE.Vector3(0, PLAYER_HEIGHT, 7);
+const obstacles = [];
+const enemies = [];
+
+let yaw = 0;
+let pitch = 0;
+let health = 100;
+let round = 1;
+let score = 0;
+let gameOver = false;
+let roundChanging = false;
+
+initScene();
+resetGame();
+animate();
+
+function initScene() {
+  const ambient = new THREE.HemisphereLight(0xdcecff, 0x28301f, 1.7);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  sun.position.set(8, 14, 5);
+  scene.add(sun);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(52, 52),
+    new THREE.MeshStandardMaterial({ color: 0x3a4037, roughness: 0.9 }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  addWall(0, 1, -25, 50, 2, 1);
+  addWall(0, 1, 25, 50, 2, 1);
+  addWall(-25, 1, 0, 1, 2, 50);
+  addWall(25, 1, 0, 1, 2, 50);
+
+  addObstacle(-7, 1, -4, 4, 2, 2);
+  addObstacle(6, 1, -8, 3, 2, 5);
+  addObstacle(8, 1, 6, 5, 2, 2);
+  addObstacle(-9, 1, 9, 3, 2, 4);
+
+  scene.add(new THREE.GridHelper(50, 50, 0x67705e, 0x30362f));
+}
+
+function addWall(x, y, z, width, height, depth) {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshStandardMaterial({ color: 0x5a6157, roughness: 0.85 }),
+  );
+  wall.position.set(x, y, z);
+  scene.add(wall);
+  obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
+}
+
+function addObstacle(x, y, z, width, height, depth) {
+  const obstacle = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshStandardMaterial({ color: 0x697163, roughness: 0.85 }),
+  );
+  obstacle.position.set(x, y, z);
+  scene.add(obstacle);
+  obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
+}
+
+function resetGame() {
+  clearEnemies();
+  playerPosition.set(0, PLAYER_HEIGHT, 7);
+  yaw = 0;
+  pitch = 0;
+  health = 100;
+  round = 1;
+  score = 0;
+  gameOver = false;
+  roundChanging = false;
+  gameOverMessage.classList.add("hidden");
+  startMessage.classList.toggle("hidden", document.pointerLockElement === canvas);
+  spawnRound(round);
+  updateHud();
+  updateCamera();
+}
+
+function spawnRound(roundNumber) {
+  const amount = 3 + (roundNumber - 1) * 2;
+
+  for (let index = 0; index < amount; index += 1) {
+    const spawn = findSpawnPoint();
+    const mesh = createEnemyMesh();
+    mesh.position.set(spawn.x, 0.8, spawn.z);
+    scene.add(mesh);
+
+    enemies.push({
+      mesh,
+      speed: 1.35 + roundNumber * 0.12,
+      lastAttack: 0,
+    });
+  }
+
+  updateHud();
+}
+
+function createEnemyMesh() {
+  const enemy = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.35, 1.1, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5eb55a, roughness: 0.8 }),
+  );
+  body.position.y = 0.45;
+  enemy.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.45, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x7fd06e, roughness: 0.75 }),
+  );
+  head.position.y = 1.25;
+  enemy.add(head);
+
+  // El grupo completo recibe el raycast gracias a esta caja invisible simple.
+  const hitBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 1.8, 0.9),
+    new THREE.MeshBasicMaterial({ visible: false }),
+  );
+  hitBox.position.y = 0.75;
+  enemy.add(hitBox);
+  enemy.userData.hitBox = hitBox;
+
+  return enemy;
+}
+
+function findSpawnPoint() {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const edge = Math.floor(Math.random() * 4);
+    const offset = randomBetween(-19, 19);
+    const point = new THREE.Vector3();
+
+    if (edge === 0) point.set(offset, 0, -20);
+    if (edge === 1) point.set(offset, 0, 20);
+    if (edge === 2) point.set(-20, 0, offset);
+    if (edge === 3) point.set(20, 0, offset);
+
+    const farEnough = point.distanceTo(new THREE.Vector3(playerPosition.x, 0, playerPosition.z)) > 12;
+
+    if (farEnough && canOccupy(point, ENEMY_RADIUS)) {
+      return point;
+    }
+  }
+
+  return new THREE.Vector3(18, 0, -18);
+}
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function updateCamera() {
+  camera.position.copy(playerPosition);
+  camera.rotation.set(pitch, yaw, 0);
+}
+
+function updateHud() {
+  healthValue.textContent = Math.max(0, Math.ceil(health));
+  roundValue.textContent = round;
+  enemyValue.textContent = enemies.length;
+  scoreValue.textContent = score;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = Math.min(clock.getDelta(), 0.05);
+
+  if (!gameOver) {
+    updatePlayer(delta);
+    updateEnemies(delta);
+    checkRoundState();
+    updateCamera();
+  }
+
+  renderer.render(scene, camera);
+}
+
+function updatePlayer(delta) {
+  const input = new THREE.Vector3();
+
+  if (keys.has("KeyW")) input.z -= 1;
+  if (keys.has("KeyS")) input.z += 1;
+  if (keys.has("KeyA")) input.x -= 1;
+  if (keys.has("KeyD")) input.x += 1;
+
+  if (input.lengthSq() === 0) return;
+
+  input.normalize();
+
+  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const movement = new THREE.Vector3()
+    .addScaledVector(forward, -input.z)
+    .addScaledVector(right, input.x)
+    .multiplyScalar(6 * delta);
+
+  const nextX = playerPosition.clone();
+  nextX.x += movement.x;
+  if (canOccupy(nextX, PLAYER_RADIUS)) playerPosition.x = nextX.x;
+
+  const nextZ = playerPosition.clone();
+  nextZ.z += movement.z;
+  if (canOccupy(nextZ, PLAYER_RADIUS)) playerPosition.z = nextZ.z;
+}
+
+function updateEnemies(delta) {
+  const now = performance.now();
+  const playerFlat = new THREE.Vector3(playerPosition.x, 0, playerPosition.z);
+
+  for (const enemy of enemies) {
+    const enemyFlat = new THREE.Vector3(enemy.mesh.position.x, 0, enemy.mesh.position.z);
+    const toPlayer = playerFlat.clone().sub(enemyFlat);
+    const distance = toPlayer.length();
+
+    enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z);
+
+    if (distance > ENEMY_ATTACK_RANGE) {
+      const step = Math.min(enemy.speed * delta, distance - ENEMY_ATTACK_RANGE);
+      const direction = toPlayer.normalize();
+      const nextX = enemy.mesh.position.clone();
+      const nextZ = enemy.mesh.position.clone();
+      nextX.x += direction.x * step;
+      nextZ.z += direction.z * step;
+
+      // Mover por ejes separados permite deslizar contra obstáculos sin pathfinding.
+      if (canOccupy(nextX, ENEMY_RADIUS)) enemy.mesh.position.x = nextX.x;
+      if (canOccupy(nextZ, ENEMY_RADIUS)) enemy.mesh.position.z = nextZ.z;
+    } else if (now - enemy.lastAttack > 850) {
+      enemy.lastAttack = now;
+      health -= 10;
+      updateHud();
+
+      if (health <= 0) {
+        endGame();
+      }
+    }
+  }
+}
+
+function canOccupy(position, radius) {
+  if (
+    position.x < -ARENA_LIMIT + radius ||
+    position.x > ARENA_LIMIT - radius ||
+    position.z < -ARENA_LIMIT + radius ||
+    position.z > ARENA_LIMIT - radius
+  ) {
+    return false;
+  }
+
+  return obstacles.every((obstacle) => {
+    const insideX = Math.abs(position.x - obstacle.x) < obstacle.halfX + radius;
+    const insideZ = Math.abs(position.z - obstacle.z) < obstacle.halfZ + radius;
+    return !(insideX && insideZ);
+  });
+}
+
+function shoot() {
+  if (gameOver || document.pointerLockElement !== canvas) return;
+
+  raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+
+  const hitBoxes = enemies.map((enemy) => enemy.mesh.userData.hitBox);
+  const hits = raycaster.intersectObjects(hitBoxes, false);
+  const targetPoint = hits[0]?.point ?? raycaster.ray.at(raycaster.far, new THREE.Vector3());
+
+  drawShot(targetPoint);
+
+  if (!hits.length) return;
+
+  const enemyGroup = hits[0].object.parent;
+  const enemyIndex = enemies.findIndex((enemy) => enemy.mesh === enemyGroup);
+
+  if (enemyIndex !== -1) {
+    scene.remove(enemyGroup);
+    enemies.splice(enemyIndex, 1);
+    score += 100;
+    updateHud();
+  }
+}
+
+function drawShot(targetPoint) {
+  const origin = camera.position.clone();
+  const geometry = new THREE.BufferGeometry().setFromPoints([origin, targetPoint]);
+  const material = new THREE.LineBasicMaterial({ color: 0xffdf64 });
+  const line = new THREE.Line(geometry, material);
+
+  scene.add(line);
+  window.setTimeout(() => {
+    scene.remove(line);
+    geometry.dispose();
+    material.dispose();
+  }, 70);
+}
+
+function checkRoundState() {
+  if (roundChanging || enemies.length > 0 || gameOver) return;
+
+  roundChanging = true;
+  window.setTimeout(() => {
+    if (gameOver) return;
+    round += 1;
+    spawnRound(round);
+    roundChanging = false;
+  }, 1200);
+}
+
+function clearEnemies() {
+  for (const enemy of enemies) {
+    scene.remove(enemy.mesh);
+  }
+  enemies.length = 0;
+}
+
+function endGame() {
+  gameOver = true;
+  health = 0;
+  updateHud();
+  gameOverMessage.classList.remove("hidden");
+
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+}
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+document.addEventListener("keydown", (event) => {
+  keys.add(event.code);
+});
+
+document.addEventListener("keyup", (event) => {
+  keys.delete(event.code);
+});
+
+document.addEventListener("mousemove", (event) => {
+  if (document.pointerLockElement !== canvas || gameOver) return;
+
+  yaw -= event.movementX * 0.0024;
+  pitch -= event.movementY * 0.0024;
+  pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch));
+});
+
+document.addEventListener("pointerlockchange", () => {
+  const locked = document.pointerLockElement === canvas;
+  startMessage.classList.toggle("hidden", locked || gameOver);
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target === restartButton) return;
+  if (gameOver) return;
+
+  if (document.pointerLockElement !== canvas) {
+    canvas.requestPointerLock();
+    return;
+  }
+
+  shoot();
+});
+
+restartButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  resetGame();
+  canvas.requestPointerLock();
+});
