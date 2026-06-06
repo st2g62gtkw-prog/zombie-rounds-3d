@@ -13,6 +13,7 @@ const bestScoreValue = document.querySelector("#bestScoreValue");
 const ammoValue = document.querySelector("#ammoValue");
 const maxAmmoValue = document.querySelector("#maxAmmoValue");
 const reloadStatus = document.querySelector("#reloadStatus");
+const damageBoostValue = document.querySelector("#damageBoostValue");
 const startMessage = document.querySelector("#startMessage");
 const gameOverMessage = document.querySelector("#gameOverMessage");
 const pauseMessage = document.querySelector("#pauseMessage");
@@ -24,6 +25,7 @@ const finalRoundValue = document.querySelector("#finalRoundValue");
 const finalScoreValue = document.querySelector("#finalScoreValue");
 const finalBestScoreValue = document.querySelector("#finalBestScoreValue");
 
+const MAX_HEALTH = 100;
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.45;
 const ARENA_LIMIT = 23;
@@ -31,6 +33,11 @@ const BEST_SCORE_KEY = "zombieRounds3D.bestScore";
 const MAX_AMMO = 8;
 const RELOAD_TIME = 1200;
 const ROUND_MESSAGE_TIME = 1000;
+const POWER_UP_CHANCE = 0.65;
+const MAX_POWER_UPS = 2;
+const POWER_UP_DURATION = 14000;
+const POWER_UP_PICKUP_RANGE = 1.2;
+const DAMAGE_BOOST_TIME = 8000;
 
 const ENEMY_TYPES = {
   normal: {
@@ -68,6 +75,24 @@ const ENEMY_TYPES = {
   },
 };
 
+const POWER_UP_TYPES = {
+  heal: {
+    key: "heal",
+    color: 0x5de08a,
+    kind: "sphere",
+  },
+  ammo: {
+    key: "ammo",
+    color: 0x5aa8ff,
+    kind: "box",
+  },
+  damage: {
+    key: "damage",
+    color: 0xff6b4a,
+    kind: "diamond",
+  },
+};
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151a20);
 scene.fog = new THREE.Fog(0x151a20, 20, 58);
@@ -91,6 +116,7 @@ const clock = new THREE.Clock();
 const playerPosition = new THREE.Vector3(0, PLAYER_HEIGHT, 7);
 const obstacles = [];
 const enemies = [];
+const powerUps = [];
 
 let yaw = 0;
 let pitch = 0;
@@ -107,6 +133,8 @@ let reloading = false;
 let reloadTimer = null;
 let roundTimer = null;
 let lastPauseChange = 0;
+let damageBoostActive = false;
+let damageBoostTimer = null;
 
 initScene();
 resetGame();
@@ -195,6 +223,12 @@ function clearRoundTimer() {
   roundTimer = null;
 }
 
+function clearDamageBoostTimer() {
+  if (!damageBoostTimer) return;
+  window.clearTimeout(damageBoostTimer);
+  damageBoostTimer = null;
+}
+
 function reloadAmmo() {
   if (!gameStarted || gameOver || paused || reloading || ammo === MAX_AMMO) return;
 
@@ -238,17 +272,20 @@ function startGame() {
 
 function resetGame(startNow = false) {
   clearEnemies();
+  clearPowerUps();
   clearReloadTimer();
   clearRoundTimer();
+  clearDamageBoostTimer();
   keys.clear();
   playerPosition.set(0, PLAYER_HEIGHT, 7);
   yaw = 0;
   pitch = 0;
-  health = 100;
+  health = MAX_HEALTH;
   round = 1;
   score = 0;
   ammo = MAX_AMMO;
   reloading = false;
+  damageBoostActive = false;
   gameStarted = startNow;
   gameOver = false;
   roundChanging = false;
@@ -391,6 +428,7 @@ function updateHud() {
   ammoValue.textContent = ammo;
   maxAmmoValue.textContent = MAX_AMMO;
   reloadStatus.textContent = reloading ? " (recargando)" : "";
+  damageBoostValue.textContent = damageBoostActive ? "x2" : "Normal";
 }
 
 function animate() {
@@ -400,6 +438,7 @@ function animate() {
 
   if (gameStarted && !gameOver && !paused) {
     updatePlayer(delta);
+    updatePowerUps();
     updateEnemies(delta);
     checkRoundState();
     updateCamera();
@@ -519,7 +558,7 @@ function shoot() {
 
   if (enemyIndex !== -1) {
     const enemy = enemies[enemyIndex];
-    enemy.health -= 1;
+    enemy.health -= damageBoostActive ? 2 : 1;
 
     if (enemy.health <= 0) {
       scene.remove(enemyGroup);
@@ -546,10 +585,125 @@ function drawShot(targetPoint) {
   }, 70);
 }
 
+function maybeSpawnPowerUp() {
+  if (powerUps.length >= MAX_POWER_UPS || Math.random() > POWER_UP_CHANCE) return;
+
+  const typeKeys = Object.keys(POWER_UP_TYPES);
+  const type = POWER_UP_TYPES[typeKeys[Math.floor(Math.random() * typeKeys.length)]];
+  const position = findPowerUpPoint();
+  const mesh = createPowerUpMesh(type);
+  mesh.position.set(position.x, 0.45, position.z);
+  scene.add(mesh);
+
+  powerUps.push({
+    mesh,
+    type: type.key,
+    expiresAt: performance.now() + POWER_UP_DURATION,
+  });
+}
+
+function createPowerUpMesh(type) {
+  let geometry;
+
+  if (type.kind === "sphere") {
+    geometry = new THREE.SphereGeometry(0.38, 12, 8);
+  } else if (type.kind === "box") {
+    geometry = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+  } else {
+    geometry = new THREE.OctahedronGeometry(0.48, 0);
+  }
+
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      color: type.color,
+      emissive: type.color,
+      emissiveIntensity: 0.18,
+      roughness: 0.55,
+    }),
+  );
+  mesh.userData.powerUpType = type.key;
+
+  return mesh;
+}
+
+function findPowerUpPoint() {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const point = new THREE.Vector3(randomBetween(-18, 18), 0, randomBetween(-18, 18));
+    const farEnough = point.distanceTo(new THREE.Vector3(playerPosition.x, 0, playerPosition.z)) > 5;
+
+    if (farEnough && canOccupy(point, 0.5)) {
+      return point;
+    }
+  }
+
+  return new THREE.Vector3(0, 0, -8);
+}
+
+function updatePowerUps() {
+  const now = performance.now();
+  const playerFlat = new THREE.Vector3(playerPosition.x, 0, playerPosition.z);
+
+  for (let index = powerUps.length - 1; index >= 0; index -= 1) {
+    const powerUp = powerUps[index];
+    const powerUpFlat = new THREE.Vector3(powerUp.mesh.position.x, 0, powerUp.mesh.position.z);
+
+    powerUp.mesh.rotation.y += 0.04;
+    powerUp.mesh.position.y = 0.45 + Math.sin(now * 0.006 + index) * 0.08;
+
+    if (now > powerUp.expiresAt) {
+      removePowerUp(index);
+      continue;
+    }
+
+    if (powerUpFlat.distanceTo(playerFlat) <= POWER_UP_PICKUP_RANGE) {
+      applyPowerUp(powerUp.type);
+      removePowerUp(index);
+    }
+  }
+}
+
+function applyPowerUp(type) {
+  if (type === "heal") {
+    health = Math.min(MAX_HEALTH, health + 25);
+  }
+
+  if (type === "ammo") {
+    ammo = MAX_AMMO;
+    reloading = false;
+    clearReloadTimer();
+  }
+
+  if (type === "damage") {
+    activateDamageBoost();
+  }
+
+  updateHud();
+}
+
+function activateDamageBoost() {
+  damageBoostActive = true;
+  clearDamageBoostTimer();
+
+  damageBoostTimer = window.setTimeout(() => {
+    damageBoostActive = false;
+    damageBoostTimer = null;
+    updateHud();
+  }, DAMAGE_BOOST_TIME);
+}
+
+function removePowerUp(index) {
+  const [powerUp] = powerUps.splice(index, 1);
+  scene.remove(powerUp.mesh);
+  powerUp.mesh.geometry.dispose();
+  powerUp.mesh.material.dispose();
+}
+
 function checkRoundState() {
   if (roundChanging || enemies.length > 0 || gameOver) return;
 
   roundChanging = true;
+  maybeSpawnPowerUp();
   round += 1;
   roundMessageText.textContent = `Ronda ${round}`;
   roundMessage.classList.remove("hidden");
@@ -571,12 +725,20 @@ function clearEnemies() {
   enemies.length = 0;
 }
 
+function clearPowerUps() {
+  while (powerUps.length > 0) {
+    removePowerUp(powerUps.length - 1);
+  }
+}
+
 function endGame() {
   gameOver = true;
   gameStarted = false;
   health = 0;
   clearReloadTimer();
+  clearDamageBoostTimer();
   reloading = false;
+  damageBoostActive = false;
   updateBestScore();
   updateHud();
   finalRoundValue.textContent = round;

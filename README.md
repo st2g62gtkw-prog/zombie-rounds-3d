@@ -22,6 +22,14 @@ Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
 - Zombie rapido: mas pequeno y veloz, aparece desde ronda 3, 150 puntos.
 - Zombie pesado: mas grande y lento, necesita 3 disparos, aparece desde ronda 5, 250 puntos.
 
+## Power-ups
+
+- Curacion: recupera 25 puntos de vida sin superar el maximo.
+- Municion: rellena el cargador actual.
+- Dano aumentado: los disparos hacen doble dano durante 8 segundos.
+
+Al terminar una ronda puede aparecer un power-up. Como maximo hay 2 activos y desaparecen si no se recogen a tiempo.
+
 ## Ejecutar localmente
 
 Puedes abrir `index.html` directamente en el navegador. Si prefieres servirlo como sitio estatico:
