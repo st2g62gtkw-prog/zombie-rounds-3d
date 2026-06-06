@@ -15,19 +15,46 @@
         <div>Ronda: <span id="roundValue">1</span></div>
         <div>Enemigos: <span id="enemyValue">0</span></div>
         <div>Puntaje: <span id="scoreValue">0</span></div>
+        <div>Record: <span id="bestScoreValue">0</span></div>
       </section>
 
       <div id="crosshair" aria-hidden="true"></div>
 
       <section id="startMessage" class="message">
-        <h1>Zombie Rounds 3D</h1>
-        <p>Click para capturar el mouse. WASD para moverte. Click para disparar.</p>
+        <div class="messagePanel">
+          <h1>Zombie Rounds 3D</h1>
+          <p>Sobrevive rondas de enemigos simples y suma puntos.</p>
+          <ul class="controlsList">
+            <li>WASD: moverse</li>
+            <li>Mouse: mirar</li>
+            <li>Click: disparar</li>
+            <li>R: reiniciar al perder</li>
+          </ul>
+          <button id="playButton" type="button">Jugar</button>
+        </div>
       </section>
 
       <section id="gameOverMessage" class="message hidden" aria-live="polite">
-        <h1>Derrota</h1>
-        <p>Los zombies llegaron demasiado cerca.</p>
-        <button id="restartButton" type="button">Reiniciar</button>
+        <div class="messagePanel">
+          <h1>Derrota</h1>
+          <p>Los zombies llegaron demasiado cerca.</p>
+          <dl class="statsList">
+            <div>
+              <dt>Ronda alcanzada</dt>
+              <dd id="finalRoundValue">1</dd>
+            </div>
+            <div>
+              <dt>Puntaje final</dt>
+              <dd id="finalScoreValue">0</dd>
+            </div>
+            <div>
+              <dt>Record</dt>
+              <dd id="finalBestScoreValue">0</dd>
+            </div>
+          </dl>
+          <p class="hintText">Presiona R o usa el boton para reiniciar.</p>
+          <button id="restartButton" type="button">Reiniciar</button>
+        </div>
       </section>
     </main>
 

@@ -9,15 +9,21 @@ const healthValue = document.querySelector("#healthValue");
 const roundValue = document.querySelector("#roundValue");
 const enemyValue = document.querySelector("#enemyValue");
 const scoreValue = document.querySelector("#scoreValue");
+const bestScoreValue = document.querySelector("#bestScoreValue");
 const startMessage = document.querySelector("#startMessage");
 const gameOverMessage = document.querySelector("#gameOverMessage");
+const playButton = document.querySelector("#playButton");
 const restartButton = document.querySelector("#restartButton");
+const finalRoundValue = document.querySelector("#finalRoundValue");
+const finalScoreValue = document.querySelector("#finalScoreValue");
+const finalBestScoreValue = document.querySelector("#finalBestScoreValue");
 
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.45;
 const ENEMY_RADIUS = 0.42;
 const ARENA_LIMIT = 23;
 const ENEMY_ATTACK_RANGE = 1.05;
+const BEST_SCORE_KEY = "zombieRounds3D.bestScore";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151a20);
@@ -48,6 +54,8 @@ let pitch = 0;
 let health = 100;
 let round = 1;
 let score = 0;
+let bestScore = loadBestScore();
+let gameStarted = false;
 let gameOver = false;
 let roundChanging = false;
 
@@ -103,19 +111,49 @@ function addObstacle(x, y, z, width, height, depth) {
   obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
 }
 
-function resetGame() {
+function loadBestScore() {
+  try {
+    const savedScore = Number(localStorage.getItem(BEST_SCORE_KEY));
+    return Number.isFinite(savedScore) ? savedScore : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveBestScore() {
+  try {
+    localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+  } catch {
+    // El juego sigue funcionando aunque el navegador bloquee localStorage.
+  }
+}
+
+function updateBestScore() {
+  if (score <= bestScore) return;
+  bestScore = score;
+  saveBestScore();
+}
+
+function startGame() {
+  resetGame(true);
+  canvas.requestPointerLock();
+}
+
+function resetGame(startNow = false) {
   clearEnemies();
+  keys.clear();
   playerPosition.set(0, PLAYER_HEIGHT, 7);
   yaw = 0;
   pitch = 0;
   health = 100;
   round = 1;
   score = 0;
+  gameStarted = startNow;
   gameOver = false;
   roundChanging = false;
   gameOverMessage.classList.add("hidden");
-  startMessage.classList.toggle("hidden", document.pointerLockElement === canvas);
-  spawnRound(round);
+  startMessage.classList.toggle("hidden", startNow);
+  if (startNow) spawnRound(round);
   updateHud();
   updateCamera();
 }
@@ -203,6 +241,7 @@ function updateHud() {
   roundValue.textContent = round;
   enemyValue.textContent = enemies.length;
   scoreValue.textContent = score;
+  bestScoreValue.textContent = bestScore;
 }
 
 function animate() {
@@ -210,7 +249,7 @@ function animate() {
 
   const delta = Math.min(clock.getDelta(), 0.05);
 
-  if (!gameOver) {
+  if (gameStarted && !gameOver) {
     updatePlayer(delta);
     updateEnemies(delta);
     checkRoundState();
@@ -267,7 +306,7 @@ function updateEnemies(delta) {
       nextX.x += direction.x * step;
       nextZ.z += direction.z * step;
 
-      // Mover por ejes separados permite deslizar contra obstáculos sin pathfinding.
+      // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
       if (canOccupy(nextX, ENEMY_RADIUS)) enemy.mesh.position.x = nextX.x;
       if (canOccupy(nextZ, ENEMY_RADIUS)) enemy.mesh.position.z = nextZ.z;
     } else if (now - enemy.lastAttack > 850) {
@@ -319,6 +358,7 @@ function shoot() {
     scene.remove(enemyGroup);
     enemies.splice(enemyIndex, 1);
     score += 100;
+    updateBestScore();
     updateHud();
   }
 }
@@ -358,8 +398,13 @@ function clearEnemies() {
 
 function endGame() {
   gameOver = true;
+  gameStarted = false;
   health = 0;
+  updateBestScore();
   updateHud();
+  finalRoundValue.textContent = round;
+  finalScoreValue.textContent = score;
+  finalBestScoreValue.textContent = bestScore;
   gameOverMessage.classList.remove("hidden");
 
   if (document.pointerLockElement === canvas) {
@@ -374,6 +419,11 @@ window.addEventListener("resize", () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.code === "KeyR" && gameOver) {
+    startGame();
+    return;
+  }
+
   keys.add(event.code);
 });
 
@@ -390,13 +440,13 @@ document.addEventListener("mousemove", (event) => {
 });
 
 document.addEventListener("pointerlockchange", () => {
-  const locked = document.pointerLockElement === canvas;
-  startMessage.classList.toggle("hidden", locked || gameOver);
+  startMessage.classList.toggle("hidden", gameStarted || gameOver);
 });
 
 document.addEventListener("click", (event) => {
+  if (event.target === playButton) return;
   if (event.target === restartButton) return;
-  if (gameOver) return;
+  if (gameOver || !gameStarted) return;
 
   if (document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();
@@ -406,8 +456,12 @@ document.addEventListener("click", (event) => {
   shoot();
 });
 
+playButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  startGame();
+});
+
 restartButton.addEventListener("click", (event) => {
   event.stopPropagation();
-  resetGame();
-  canvas.requestPointerLock();
+  startGame();
 });
