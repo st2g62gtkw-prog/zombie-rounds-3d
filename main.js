@@ -10,8 +10,14 @@ const roundValue = document.querySelector("#roundValue");
 const enemyValue = document.querySelector("#enemyValue");
 const scoreValue = document.querySelector("#scoreValue");
 const bestScoreValue = document.querySelector("#bestScoreValue");
+const ammoValue = document.querySelector("#ammoValue");
+const maxAmmoValue = document.querySelector("#maxAmmoValue");
+const reloadStatus = document.querySelector("#reloadStatus");
 const startMessage = document.querySelector("#startMessage");
 const gameOverMessage = document.querySelector("#gameOverMessage");
+const pauseMessage = document.querySelector("#pauseMessage");
+const roundMessage = document.querySelector("#roundMessage");
+const roundMessageText = document.querySelector("#roundMessageText");
 const playButton = document.querySelector("#playButton");
 const restartButton = document.querySelector("#restartButton");
 const finalRoundValue = document.querySelector("#finalRoundValue");
@@ -24,6 +30,9 @@ const ENEMY_RADIUS = 0.42;
 const ARENA_LIMIT = 23;
 const ENEMY_ATTACK_RANGE = 1.05;
 const BEST_SCORE_KEY = "zombieRounds3D.bestScore";
+const MAX_AMMO = 8;
+const RELOAD_TIME = 1200;
+const ROUND_MESSAGE_TIME = 1000;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151a20);
@@ -58,6 +67,12 @@ let bestScore = loadBestScore();
 let gameStarted = false;
 let gameOver = false;
 let roundChanging = false;
+let paused = false;
+let ammo = MAX_AMMO;
+let reloading = false;
+let reloadTimer = null;
+let roundTimer = null;
+let lastPauseChange = 0;
 
 initScene();
 resetGame();
@@ -134,6 +149,54 @@ function updateBestScore() {
   saveBestScore();
 }
 
+function clearReloadTimer() {
+  if (!reloadTimer) return;
+  window.clearTimeout(reloadTimer);
+  reloadTimer = null;
+}
+
+function clearRoundTimer() {
+  if (!roundTimer) return;
+  window.clearTimeout(roundTimer);
+  roundTimer = null;
+}
+
+function reloadAmmo() {
+  if (!gameStarted || gameOver || paused || reloading || ammo === MAX_AMMO) return;
+
+  reloading = true;
+  updateHud();
+
+  reloadTimer = window.setTimeout(() => {
+    ammo = MAX_AMMO;
+    reloading = false;
+    reloadTimer = null;
+    updateHud();
+  }, RELOAD_TIME);
+}
+
+function pauseGame() {
+  if (!gameStarted || gameOver || paused) return;
+
+  paused = true;
+  lastPauseChange = performance.now();
+  keys.clear();
+  pauseMessage.classList.remove("hidden");
+
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+}
+
+function resumeGame() {
+  if (!gameStarted || gameOver || !paused) return;
+
+  paused = false;
+  lastPauseChange = performance.now();
+  pauseMessage.classList.add("hidden");
+  canvas.requestPointerLock();
+}
+
 function startGame() {
   resetGame(true);
   canvas.requestPointerLock();
@@ -141,6 +204,8 @@ function startGame() {
 
 function resetGame(startNow = false) {
   clearEnemies();
+  clearReloadTimer();
+  clearRoundTimer();
   keys.clear();
   playerPosition.set(0, PLAYER_HEIGHT, 7);
   yaw = 0;
@@ -148,9 +213,14 @@ function resetGame(startNow = false) {
   health = 100;
   round = 1;
   score = 0;
+  ammo = MAX_AMMO;
+  reloading = false;
   gameStarted = startNow;
   gameOver = false;
   roundChanging = false;
+  paused = false;
+  pauseMessage.classList.add("hidden");
+  roundMessage.classList.add("hidden");
   gameOverMessage.classList.add("hidden");
   startMessage.classList.toggle("hidden", startNow);
   if (startNow) spawnRound(round);
@@ -242,6 +312,9 @@ function updateHud() {
   enemyValue.textContent = enemies.length;
   scoreValue.textContent = score;
   bestScoreValue.textContent = bestScore;
+  ammoValue.textContent = ammo;
+  maxAmmoValue.textContent = MAX_AMMO;
+  reloadStatus.textContent = reloading ? " (recargando)" : "";
 }
 
 function animate() {
@@ -249,7 +322,7 @@ function animate() {
 
   const delta = Math.min(clock.getDelta(), 0.05);
 
-  if (gameStarted && !gameOver) {
+  if (gameStarted && !gameOver && !paused) {
     updatePlayer(delta);
     updateEnemies(delta);
     checkRoundState();
@@ -339,7 +412,20 @@ function canOccupy(position, radius) {
 }
 
 function shoot() {
-  if (gameOver || document.pointerLockElement !== canvas) return;
+  if (
+    !gameStarted ||
+    gameOver ||
+    paused ||
+    reloading ||
+    roundChanging ||
+    ammo <= 0 ||
+    document.pointerLockElement !== canvas
+  ) {
+    return;
+  }
+
+  ammo -= 1;
+  updateHud();
 
   raycaster.setFromCamera({ x: 0, y: 0 }, camera);
 
@@ -381,12 +467,18 @@ function checkRoundState() {
   if (roundChanging || enemies.length > 0 || gameOver) return;
 
   roundChanging = true;
-  window.setTimeout(() => {
-    if (gameOver) return;
-    round += 1;
+  round += 1;
+  roundMessageText.textContent = `Ronda ${round}`;
+  roundMessage.classList.remove("hidden");
+  updateHud();
+
+  roundTimer = window.setTimeout(() => {
+    if (gameOver || !gameStarted) return;
     spawnRound(round);
+    roundMessage.classList.add("hidden");
     roundChanging = false;
-  }, 1200);
+    roundTimer = null;
+  }, ROUND_MESSAGE_TIME);
 }
 
 function clearEnemies() {
@@ -400,6 +492,8 @@ function endGame() {
   gameOver = true;
   gameStarted = false;
   health = 0;
+  clearReloadTimer();
+  reloading = false;
   updateBestScore();
   updateHud();
   finalRoundValue.textContent = round;
@@ -419,10 +513,31 @@ window.addEventListener("resize", () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.code === "Escape") {
+    if (!gameStarted || gameOver) return;
+    event.preventDefault();
+
+    if (paused) {
+      if (performance.now() - lastPauseChange < 180) return;
+      resumeGame();
+    } else {
+      pauseGame();
+    }
+
+    return;
+  }
+
   if (event.code === "KeyR" && gameOver) {
     startGame();
     return;
   }
+
+  if (event.code === "KeyR") {
+    reloadAmmo();
+    return;
+  }
+
+  if (paused) return;
 
   keys.add(event.code);
 });
@@ -432,7 +547,7 @@ document.addEventListener("keyup", (event) => {
 });
 
 document.addEventListener("mousemove", (event) => {
-  if (document.pointerLockElement !== canvas || gameOver) return;
+  if (document.pointerLockElement !== canvas || gameOver || paused) return;
 
   yaw -= event.movementX * 0.0024;
   pitch -= event.movementY * 0.0024;
@@ -441,12 +556,16 @@ document.addEventListener("mousemove", (event) => {
 
 document.addEventListener("pointerlockchange", () => {
   startMessage.classList.toggle("hidden", gameStarted || gameOver);
+
+  if (gameStarted && !gameOver && !paused && document.pointerLockElement !== canvas) {
+    pauseGame();
+  }
 });
 
 document.addEventListener("click", (event) => {
   if (event.target === playButton) return;
   if (event.target === restartButton) return;
-  if (gameOver || !gameStarted) return;
+  if (gameOver || !gameStarted || paused) return;
 
   if (document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();

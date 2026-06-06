@@ -8,10 +8,13 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 - WASD para moverte.
 - Mueve el mouse para mirar.
 - Click para disparar.
+- ESC para pausar o continuar.
+- R para recargar durante la partida.
 - R para reiniciar despues de perder.
 - Elimina todos los enemigos para pasar a la siguiente ronda.
 
 El juego guarda el puntaje maximo en `localStorage`, por lo que el record queda en el navegador donde se juega.
+Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
 
 ## Ejecutar localmente
 

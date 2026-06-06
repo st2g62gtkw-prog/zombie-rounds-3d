@@ -45,6 +45,7 @@ body {
   font-size: 15px;
   line-height: 1.25;
   user-select: none;
+  z-index: 5;
 }
 
 #crosshair {
@@ -78,6 +79,30 @@ body {
   height: 14px;
 }
 
+.centerNotice {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  pointer-events: none;
+  text-align: center;
+  z-index: 7;
+}
+
+#pauseMessage {
+  z-index: 8;
+}
+
+.centerNotice h2 {
+  margin: 0;
+  padding: 16px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(11, 14, 18, 0.78);
+  font-size: clamp(30px, 7vw, 64px);
+  letter-spacing: 0;
+}
+
 .message {
   position: fixed;
   inset: 0;
@@ -87,6 +112,7 @@ body {
   padding: 24px;
   background: rgba(7, 9, 12, 0.72);
   text-align: center;
+  z-index: 10;
 }
 
 .messagePanel {
@@ -124,6 +150,10 @@ body {
 .controlsList {
   list-style: none;
   color: #eef4fa;
+}
+
+#reloadStatus {
+  color: #e8b347;
 }
 
 .statsList > div {
@@ -173,7 +203,7 @@ button:hover {
   #hud {
     right: 10px;
     left: 10px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     min-width: 0;
     font-size: 14px;
   }

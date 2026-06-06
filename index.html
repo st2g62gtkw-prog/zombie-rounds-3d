@@ -16,6 +16,10 @@
         <div>Enemigos: <span id="enemyValue">0</span></div>
         <div>Puntaje: <span id="scoreValue">0</span></div>
         <div>Record: <span id="bestScoreValue">0</span></div>
+        <div>
+          Balas: <span id="ammoValue">8</span> /
+          <span id="maxAmmoValue">8</span><span id="reloadStatus"></span>
+        </div>
       </section>
 
       <div id="crosshair" aria-hidden="true"></div>
@@ -28,10 +32,19 @@
             <li>WASD: moverse</li>
             <li>Mouse: mirar</li>
             <li>Click: disparar</li>
-            <li>R: reiniciar al perder</li>
+            <li>R: recargar</li>
+            <li>ESC: pausar o continuar</li>
           </ul>
           <button id="playButton" type="button">Jugar</button>
         </div>
+      </section>
+
+      <section id="pauseMessage" class="centerNotice hidden" aria-live="polite">
+        <h2>Pausa</h2>
+      </section>
+
+      <section id="roundMessage" class="centerNotice hidden" aria-live="polite">
+        <h2 id="roundMessageText">Ronda 1</h2>
       </section>
 
       <section id="gameOverMessage" class="message hidden" aria-live="polite">
