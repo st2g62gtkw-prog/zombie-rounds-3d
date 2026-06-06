@@ -79,6 +79,49 @@ body {
   height: 14px;
 }
 
+#damageFlash {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background: rgba(210, 45, 45, 0);
+  pointer-events: none;
+  transition: background 180ms ease-out;
+}
+
+#damageFlash.active {
+  background: rgba(210, 45, 45, 0.24);
+}
+
+#scorePopups {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.scorePopup {
+  position: fixed;
+  top: 46%;
+  left: 50%;
+  color: #ffe08a;
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+  transform: translate(-50%, -50%);
+  animation: scorePopup 800ms ease-out forwards;
+}
+
+@keyframes scorePopup {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -95%) scale(1.15);
+  }
+}
+
 .centerNotice {
   position: fixed;
   inset: 0;

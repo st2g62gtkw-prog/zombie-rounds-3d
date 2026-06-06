@@ -14,6 +14,8 @@ const ammoValue = document.querySelector("#ammoValue");
 const maxAmmoValue = document.querySelector("#maxAmmoValue");
 const reloadStatus = document.querySelector("#reloadStatus");
 const damageBoostValue = document.querySelector("#damageBoostValue");
+const damageFlash = document.querySelector("#damageFlash");
+const scorePopups = document.querySelector("#scorePopups");
 const startMessage = document.querySelector("#startMessage");
 const gameOverMessage = document.querySelector("#gameOverMessage");
 const pauseMessage = document.querySelector("#pauseMessage");
@@ -108,6 +110,8 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const raycaster = new THREE.Raycaster();
 raycaster.far = 60;
@@ -136,17 +140,20 @@ let roundTimer = null;
 let lastPauseChange = 0;
 let damageBoostActive = false;
 let damageBoostTimer = null;
+let damageFlashTimer = null;
 
 initScene();
 resetGame();
 animate();
 
 function initScene() {
-  const ambient = new THREE.HemisphereLight(0xdcecff, 0x28301f, 1.7);
+  const ambient = new THREE.HemisphereLight(0xdcecff, 0x28301f, 1.35);
   scene.add(ambient);
 
-  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-  sun.position.set(8, 14, 5);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.45);
+  sun.position.set(9, 16, 6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
   scene.add(sun);
 
   const floor = new THREE.Mesh(
@@ -154,7 +161,13 @@ function initScene() {
     new THREE.MeshStandardMaterial({ color: 0x3a4037, roughness: 0.9 }),
   );
   floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
   scene.add(floor);
+
+  addFloorPatch(0, 0, 11, 11, 0x43483e);
+  addFloorPatch(-14, -13, 8, 8, 0x38453f);
+  addFloorPatch(14, -11, 8, 7, 0x454039);
+  addFloorPatch(0, 15, 13, 6, 0x3d4550);
 
   addWall(0, 1, -25, 50, 2, 1);
   addWall(0, 1, 25, 50, 2, 1);
@@ -165,6 +178,21 @@ function initScene() {
   addObstacle(6, 1, -8, 3, 2, 5);
   addObstacle(8, 1, 6, 5, 2, 2);
   addObstacle(-9, 1, 9, 3, 2, 4);
+  addObstacle(-15, 1, -13, 2, 2, 2);
+  addObstacle(-12, 1, -13, 2, 2, 2);
+  addObstacle(-14, 1, -10, 5, 2, 1.2);
+  addObstacle(14, 1, -11, 4, 2, 1.4);
+  addObstacle(16, 1, -6, 1.4, 2, 4);
+  addObstacle(-16, 1, 2, 1.4, 2, 5);
+  addObstacle(-13, 1, 6, 4, 2, 1.4);
+  addObstacle(-5, 1, 15, 4, 2, 1.4);
+  addObstacle(5, 1, 15, 4, 2, 1.4);
+
+  addLamp(-18, -18, 0xffd98a);
+  addLamp(18, -16, 0x9fc8ff);
+  addLamp(-18, 16, 0x9cffb5);
+  addMarker(0, -16, 0xe8b347);
+  addMarker(16, 14, 0x5aa8ff);
 
   scene.add(new THREE.GridHelper(50, 50, 0x67705e, 0x30362f));
 }
@@ -175,6 +203,8 @@ function addWall(x, y, z, width, height, depth) {
     new THREE.MeshStandardMaterial({ color: 0x5a6157, roughness: 0.85 }),
   );
   wall.position.set(x, y, z);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
   scene.add(wall);
   obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
 }
@@ -185,8 +215,65 @@ function addObstacle(x, y, z, width, height, depth) {
     new THREE.MeshStandardMaterial({ color: 0x697163, roughness: 0.85 }),
   );
   obstacle.position.set(x, y, z);
+  obstacle.castShadow = true;
+  obstacle.receiveShadow = true;
   scene.add(obstacle);
   obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
+}
+
+function addFloorPatch(x, z, width, depth, color) {
+  const patch = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.95 }),
+  );
+  patch.rotation.x = -Math.PI / 2;
+  patch.position.set(x, 0.015, z);
+  patch.receiveShadow = true;
+  scene.add(patch);
+}
+
+function addLamp(x, z, color) {
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.7 }),
+  );
+  pole.position.set(x, 1.1, z);
+  pole.castShadow = true;
+  scene.add(pole);
+
+  const cap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 10, 8),
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.35,
+      roughness: 0.45,
+    }),
+  );
+  cap.position.set(x, 2.35, z);
+  scene.add(cap);
+
+  const light = new THREE.PointLight(color, 0.75, 10);
+  light.position.set(x, 2.4, z);
+  scene.add(light);
+}
+
+function addMarker(x, z, color) {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.42, 0.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x24292d, roughness: 0.75 }),
+  );
+  base.position.set(x, 0.1, z);
+  base.receiveShadow = true;
+  scene.add(base);
+
+  const top = new THREE.Mesh(
+    new THREE.ConeGeometry(0.45, 1.1, 6),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.6 }),
+  );
+  top.position.set(x, 0.75, z);
+  top.castShadow = true;
+  scene.add(top);
 }
 
 function loadBestScore() {
@@ -228,6 +315,28 @@ function clearDamageBoostTimer() {
   if (!damageBoostTimer) return;
   window.clearTimeout(damageBoostTimer);
   damageBoostTimer = null;
+}
+
+function clearDamageFlashTimer() {
+  if (damageFlashTimer) {
+    window.clearTimeout(damageFlashTimer);
+    damageFlashTimer = null;
+  }
+
+  damageFlash.classList.remove("active");
+}
+
+function showDamageFlash() {
+  damageFlash.classList.add("active");
+
+  if (damageFlashTimer) {
+    window.clearTimeout(damageFlashTimer);
+  }
+
+  damageFlashTimer = window.setTimeout(() => {
+    damageFlash.classList.remove("active");
+    damageFlashTimer = null;
+  }, 180);
 }
 
 function reloadAmmo() {
@@ -277,6 +386,7 @@ function resetGame(startNow = false) {
   clearReloadTimer();
   clearRoundTimer();
   clearDamageBoostTimer();
+  clearDamageFlashTimer();
   keys.clear();
   playerPosition.set(0, PLAYER_HEIGHT, 7);
   yaw = 0;
@@ -507,13 +617,18 @@ function updateEnemies(delta) {
 
     if (currentDistance <= attackRange && now - enemy.lastAttack > ENEMY_ATTACK_COOLDOWN) {
       enemy.lastAttack = now;
-      health -= 10;
-      updateHud();
-
-      if (health <= 0) {
-        endGame();
-      }
+      damagePlayer(10);
     }
+  }
+}
+
+function damagePlayer(amount) {
+  health = Math.max(0, health - amount);
+  showDamageFlash();
+  updateHud();
+
+  if (health <= 0) {
+    endGame();
   }
 }
 
@@ -577,6 +692,7 @@ function shoot() {
       scene.remove(enemyGroup);
       enemies.splice(enemyIndex, 1);
       score += enemy.points;
+      showScorePopup(enemy.points);
       updateBestScore();
     }
 
@@ -596,6 +712,19 @@ function drawShot(targetPoint) {
     geometry.dispose();
     material.dispose();
   }, 70);
+}
+
+function showScorePopup(points) {
+  const popup = document.createElement("div");
+  popup.className = "scorePopup";
+  popup.textContent = `+${points}`;
+  popup.style.left = `${50 + randomBetween(-7, 7)}%`;
+  popup.style.top = `${45 + randomBetween(-5, 5)}%`;
+  scorePopups.appendChild(popup);
+
+  window.setTimeout(() => {
+    popup.remove();
+  }, 850);
 }
 
 function maybeSpawnPowerUp() {
@@ -750,6 +879,7 @@ function endGame() {
   health = 0;
   clearReloadTimer();
   clearDamageBoostTimer();
+  clearDamageFlashTimer();
   reloading = false;
   damageBoostActive = false;
   updateBestScore();

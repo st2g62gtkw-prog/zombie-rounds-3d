@@ -30,6 +30,10 @@ Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
 
 Al terminar una ronda puede aparecer un power-up. Como maximo hay 2 activos y desaparecen si no se recogen a tiempo.
 
+## Presentacion
+
+El mapa usa zonas de piso, cajas, barreras, lamparas y marcadores hechos con geometrias basicas. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
+
 ## Ejecutar localmente
 
 Puedes abrir `index.html` directamente en el navegador. Si prefieres servirlo como sitio estatico:
