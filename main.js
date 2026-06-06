@@ -26,13 +26,47 @@ const finalBestScoreValue = document.querySelector("#finalBestScoreValue");
 
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.45;
-const ENEMY_RADIUS = 0.42;
 const ARENA_LIMIT = 23;
-const ENEMY_ATTACK_RANGE = 1.05;
 const BEST_SCORE_KEY = "zombieRounds3D.bestScore";
 const MAX_AMMO = 8;
 const RELOAD_TIME = 1200;
 const ROUND_MESSAGE_TIME = 1000;
+
+const ENEMY_TYPES = {
+  normal: {
+    key: "normal",
+    bodyColor: 0x5eb55a,
+    headColor: 0x7fd06e,
+    scale: 1,
+    radius: 0.42,
+    spawnY: 0.8,
+    speed: 1.35,
+    health: 1,
+    points: 100,
+  },
+  fast: {
+    key: "fast",
+    bodyColor: 0x8fd14f,
+    headColor: 0xd4f06c,
+    scale: 0.74,
+    radius: 0.32,
+    spawnY: 0.62,
+    speed: 2.05,
+    health: 1,
+    points: 150,
+  },
+  heavy: {
+    key: "heavy",
+    bodyColor: 0x7a5b35,
+    headColor: 0xb08a45,
+    scale: 1.35,
+    radius: 0.58,
+    spawnY: 1,
+    speed: 0.85,
+    health: 3,
+    points: 250,
+  },
+};
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151a20);
@@ -221,6 +255,7 @@ function resetGame(startNow = false) {
   paused = false;
   pauseMessage.classList.add("hidden");
   roundMessage.classList.add("hidden");
+  roundMessageText.textContent = "Ronda 1";
   gameOverMessage.classList.add("hidden");
   startMessage.classList.toggle("hidden", startNow);
   if (startNow) spawnRound(round);
@@ -230,16 +265,22 @@ function resetGame(startNow = false) {
 
 function spawnRound(roundNumber) {
   const amount = 3 + (roundNumber - 1) * 2;
+  const enemyTypes = buildRoundEnemyTypes(roundNumber, amount);
 
-  for (let index = 0; index < amount; index += 1) {
-    const spawn = findSpawnPoint();
-    const mesh = createEnemyMesh();
-    mesh.position.set(spawn.x, 0.8, spawn.z);
+  for (const typeKey of enemyTypes) {
+    const type = ENEMY_TYPES[typeKey];
+    const spawn = findSpawnPoint(type.radius);
+    const mesh = createEnemyMesh(type);
+    mesh.position.set(spawn.x, type.spawnY, spawn.z);
     scene.add(mesh);
 
     enemies.push({
       mesh,
-      speed: 1.35 + roundNumber * 0.12,
+      type: type.key,
+      radius: type.radius,
+      health: type.health,
+      points: type.points,
+      speed: type.speed + roundNumber * 0.09,
       lastAttack: 0,
     });
   }
@@ -247,19 +288,54 @@ function spawnRound(roundNumber) {
   updateHud();
 }
 
-function createEnemyMesh() {
+function buildRoundEnemyTypes(roundNumber, amount) {
+  let fastCount = 0;
+  let heavyCount = 0;
+
+  if (roundNumber >= 3) {
+    fastCount = Math.max(1, Math.floor(amount * 0.25));
+  }
+
+  if (roundNumber >= 5) {
+    heavyCount = Math.max(1, Math.floor(amount * 0.18));
+    fastCount = Math.max(1, Math.floor(amount * 0.3));
+  }
+
+  const normalCount = Math.max(0, amount - fastCount - heavyCount);
+  const types = [
+    ...Array(normalCount).fill("normal"),
+    ...Array(fastCount).fill("fast"),
+    ...Array(heavyCount).fill("heavy"),
+  ];
+
+  return shuffleArray(types);
+}
+
+function shuffleArray(items) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const otherIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[otherIndex]] = [shuffled[otherIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function createEnemyMesh(type) {
   const enemy = new THREE.Group();
+  enemy.scale.setScalar(type.scale);
 
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.35, 0.35, 1.1, 8),
-    new THREE.MeshStandardMaterial({ color: 0x5eb55a, roughness: 0.8 }),
+    new THREE.MeshStandardMaterial({ color: type.bodyColor, roughness: 0.8 }),
   );
   body.position.y = 0.45;
   enemy.add(body);
 
   const head = new THREE.Mesh(
     new THREE.BoxGeometry(0.55, 0.45, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0x7fd06e, roughness: 0.75 }),
+    new THREE.MeshStandardMaterial({ color: type.headColor, roughness: 0.75 }),
   );
   head.position.y = 1.25;
   enemy.add(head);
@@ -276,7 +352,7 @@ function createEnemyMesh() {
   return enemy;
 }
 
-function findSpawnPoint() {
+function findSpawnPoint(radius) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const edge = Math.floor(Math.random() * 4);
     const offset = randomBetween(-19, 19);
@@ -289,7 +365,7 @@ function findSpawnPoint() {
 
     const farEnough = point.distanceTo(new THREE.Vector3(playerPosition.x, 0, playerPosition.z)) > 12;
 
-    if (farEnough && canOccupy(point, ENEMY_RADIUS)) {
+    if (farEnough && canOccupy(point, radius)) {
       return point;
     }
   }
@@ -368,11 +444,12 @@ function updateEnemies(delta) {
     const enemyFlat = new THREE.Vector3(enemy.mesh.position.x, 0, enemy.mesh.position.z);
     const toPlayer = playerFlat.clone().sub(enemyFlat);
     const distance = toPlayer.length();
+    const attackRange = PLAYER_RADIUS + enemy.radius + 0.2;
 
     enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z);
 
-    if (distance > ENEMY_ATTACK_RANGE) {
-      const step = Math.min(enemy.speed * delta, distance - ENEMY_ATTACK_RANGE);
+    if (distance > attackRange) {
+      const step = Math.min(enemy.speed * delta, distance - attackRange);
       const direction = toPlayer.normalize();
       const nextX = enemy.mesh.position.clone();
       const nextZ = enemy.mesh.position.clone();
@@ -380,8 +457,8 @@ function updateEnemies(delta) {
       nextZ.z += direction.z * step;
 
       // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
-      if (canOccupy(nextX, ENEMY_RADIUS)) enemy.mesh.position.x = nextX.x;
-      if (canOccupy(nextZ, ENEMY_RADIUS)) enemy.mesh.position.z = nextZ.z;
+      if (canOccupy(nextX, enemy.radius)) enemy.mesh.position.x = nextX.x;
+      if (canOccupy(nextZ, enemy.radius)) enemy.mesh.position.z = nextZ.z;
     } else if (now - enemy.lastAttack > 850) {
       enemy.lastAttack = now;
       health -= 10;
@@ -441,10 +518,16 @@ function shoot() {
   const enemyIndex = enemies.findIndex((enemy) => enemy.mesh === enemyGroup);
 
   if (enemyIndex !== -1) {
-    scene.remove(enemyGroup);
-    enemies.splice(enemyIndex, 1);
-    score += 100;
-    updateBestScore();
+    const enemy = enemies[enemyIndex];
+    enemy.health -= 1;
+
+    if (enemy.health <= 0) {
+      scene.remove(enemyGroup);
+      enemies.splice(enemyIndex, 1);
+      score += enemy.points;
+      updateBestScore();
+    }
+
     updateHud();
   }
 }

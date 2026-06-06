@@ -16,6 +16,12 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 El juego guarda el puntaje maximo en `localStorage`, por lo que el record queda en el navegador donde se juega.
 Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
 
+## Enemigos
+
+- Zombie normal: velocidad media, 1 disparo, 100 puntos.
+- Zombie rapido: mas pequeno y veloz, aparece desde ronda 3, 150 puntos.
+- Zombie pesado: mas grande y lento, necesita 3 disparos, aparece desde ronda 5, 250 puntos.
+
 ## Ejecutar localmente
 
 Puedes abrir `index.html` directamente en el navegador. Si prefieres servirlo como sitio estatico:
