@@ -169,10 +169,11 @@ function initScene() {
   addWall(-25, 1, 0, 1, 2, 50);
   addWall(25, 1, 0, 1, 2, 50);
 
-  addObstacle(-13.5, 1, -11.8, 6, 2, 5.6);
-  addObstacle(13.5, 1, -10, 6, 2, 5);
-  addObstacle(-13.5, 1, 10, 6, 2, 5);
-  addObstacle(12.5, 1, 12, 6, 2, 5);
+  addObstacle(-14, 1, -12, 2.5, 2, 8);
+  addObstacle(-9, 1, 8, 10, 2, 2.5);
+  addObstacle(12, 1, -10, 2.5, 2, 12);
+  addObstacle(10, 1, 12, 8, 2, 2.5);
+  addObstacle(14, 1, 8, 2.5, 2, 8);
 }
 
 function addWall(x, y, z, width, height, depth) {
