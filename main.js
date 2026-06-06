@@ -178,8 +178,7 @@ function initScene() {
   addObstacle(6, 1, -8, 3, 2, 5);
   addObstacle(8, 1, 6, 5, 2, 2);
   addObstacle(-9, 1, 9, 3, 2, 4);
-  addObstacle(-15, 1, -13, 2, 2, 2);
-  addObstacle(-12, 1, -13, 2, 2, 2);
+  addObstacle(-13.5, 1, -13, 5, 2, 2);
   addObstacle(-14, 1, -10, 5, 2, 1.2);
   addObstacle(14, 1, -11, 4, 2, 1.4);
   addObstacle(16, 1, -6, 1.4, 2, 4);
@@ -187,12 +186,6 @@ function initScene() {
   addObstacle(-13, 1, 6, 4, 2, 1.4);
   addObstacle(-5, 1, 15, 4, 2, 1.4);
   addObstacle(5, 1, 15, 4, 2, 1.4);
-
-  addLamp(-18, -18, 0xffd98a);
-  addLamp(18, -16, 0x9fc8ff);
-  addLamp(-18, 16, 0x9cffb5);
-  addMarker(0, -16, 0xe8b347);
-  addMarker(16, 14, 0x5aa8ff);
 
   scene.add(new THREE.GridHelper(50, 50, 0x67705e, 0x30362f));
 }
@@ -230,50 +223,6 @@ function addFloorPatch(x, z, width, depth, color) {
   patch.position.set(x, 0.015, z);
   patch.receiveShadow = true;
   scene.add(patch);
-}
-
-function addLamp(x, z, color) {
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8),
-    new THREE.MeshStandardMaterial({ color: 0x2f3438, roughness: 0.7 }),
-  );
-  pole.position.set(x, 1.1, z);
-  pole.castShadow = true;
-  scene.add(pole);
-
-  const cap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 10, 8),
-    new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.35,
-      roughness: 0.45,
-    }),
-  );
-  cap.position.set(x, 2.35, z);
-  scene.add(cap);
-
-  const light = new THREE.PointLight(color, 0.75, 10);
-  light.position.set(x, 2.4, z);
-  scene.add(light);
-}
-
-function addMarker(x, z, color) {
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.42, 0.42, 0.2, 8),
-    new THREE.MeshStandardMaterial({ color: 0x24292d, roughness: 0.75 }),
-  );
-  base.position.set(x, 0.1, z);
-  base.receiveShadow = true;
-  scene.add(base);
-
-  const top = new THREE.Mesh(
-    new THREE.ConeGeometry(0.45, 1.1, 6),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.6 }),
-  );
-  top.position.set(x, 0.75, z);
-  top.castShadow = true;
-  scene.add(top);
 }
 
 function loadBestScore() {
@@ -587,6 +536,8 @@ function updatePlayer(delta) {
 }
 
 function updateEnemies(delta) {
+  if (paused || gameOver) return;
+
   const now = performance.now();
 
   for (const enemy of enemies) {
