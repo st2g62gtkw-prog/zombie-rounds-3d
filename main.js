@@ -38,6 +38,7 @@ const MAX_POWER_UPS = 2;
 const POWER_UP_DURATION = 14000;
 const POWER_UP_PICKUP_RANGE = 1.2;
 const DAMAGE_BOOST_TIME = 8000;
+const ENEMY_ATTACK_COOLDOWN = 850;
 
 const ENEMY_TYPES = {
   normal: {
@@ -477,11 +478,13 @@ function updatePlayer(delta) {
 
 function updateEnemies(delta) {
   const now = performance.now();
-  const playerFlat = new THREE.Vector3(playerPosition.x, 0, playerPosition.z);
 
   for (const enemy of enemies) {
-    const enemyFlat = new THREE.Vector3(enemy.mesh.position.x, 0, enemy.mesh.position.z);
-    const toPlayer = playerFlat.clone().sub(enemyFlat);
+    const toPlayer = new THREE.Vector3(
+      playerPosition.x - enemy.mesh.position.x,
+      0,
+      playerPosition.z - enemy.mesh.position.z,
+    );
     const distance = toPlayer.length();
     const attackRange = PLAYER_RADIUS + enemy.radius + 0.2;
 
@@ -498,7 +501,11 @@ function updateEnemies(delta) {
       // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
       if (canOccupy(nextX, enemy.radius)) enemy.mesh.position.x = nextX.x;
       if (canOccupy(nextZ, enemy.radius)) enemy.mesh.position.z = nextZ.z;
-    } else if (now - enemy.lastAttack > 850) {
+    }
+
+    const currentDistance = getHorizontalDistance(enemy.mesh.position, playerPosition);
+
+    if (currentDistance <= attackRange && now - enemy.lastAttack > ENEMY_ATTACK_COOLDOWN) {
       enemy.lastAttack = now;
       health -= 10;
       updateHud();
@@ -508,6 +515,12 @@ function updateEnemies(delta) {
       }
     }
   }
+}
+
+function getHorizontalDistance(first, second) {
+  const deltaX = first.x - second.x;
+  const deltaZ = first.z - second.z;
+  return Math.hypot(deltaX, deltaZ);
 }
 
 function canOccupy(position, radius) {
