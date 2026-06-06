@@ -41,6 +41,7 @@ const POWER_UP_DURATION = 14000;
 const POWER_UP_PICKUP_RANGE = 1.2;
 const DAMAGE_BOOST_TIME = 8000;
 const ENEMY_ATTACK_COOLDOWN = 850;
+const ENEMY_ATTACK_RANGE = 1.7;
 
 const ENEMY_TYPES = {
   normal: {
@@ -476,6 +477,7 @@ function animate() {
     updatePlayer(delta);
     updatePowerUps();
     updateEnemies(delta);
+    checkEnemyAttacks();
     checkRoundState();
     updateCamera();
   }
@@ -514,8 +516,6 @@ function updatePlayer(delta) {
 function updateEnemies(delta) {
   if (paused || gameOver) return;
 
-  const now = performance.now();
-
   for (const enemy of enemies) {
     const toPlayer = new THREE.Vector3(
       playerPosition.x - enemy.mesh.position.x,
@@ -523,19 +523,27 @@ function updateEnemies(delta) {
       playerPosition.z - enemy.mesh.position.z,
     );
     const distance = toPlayer.length();
-    const attackRange = PLAYER_RADIUS + enemy.radius + 0.2;
+    const stopRange = PLAYER_RADIUS + enemy.radius + 0.15;
 
     enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z);
 
-    if (distance > attackRange) {
-      const step = Math.min(enemy.speed * delta, distance - attackRange);
+    if (distance > stopRange) {
+      const step = Math.min(enemy.speed * delta, distance - stopRange);
       const direction = toPlayer.normalize();
       moveEnemy(enemy, direction, step);
     }
+  }
+}
 
+function checkEnemyAttacks() {
+  if (paused || gameOver) return;
+
+  const now = performance.now();
+
+  for (const enemy of enemies) {
     const currentDistance = getHorizontalDistance(enemy.mesh.position, playerPosition);
 
-    if (currentDistance <= attackRange && now - enemy.lastAttack > ENEMY_ATTACK_COOLDOWN) {
+    if (currentDistance <= ENEMY_ATTACK_RANGE && now - enemy.lastAttack > ENEMY_ATTACK_COOLDOWN) {
       enemy.lastAttack = now;
       damagePlayer(10);
     }
@@ -562,10 +570,12 @@ function moveEnemy(enemy, direction, step) {
   const sideStep = step * 0.9;
 
   if (tryMoveEnemySideways(enemy, side, sideStep)) return;
+  if (tryMoveEnemyAlongAxes(enemy, side, sideStep)) return;
 
   enemy.avoidSide *= -1;
   side.multiplyScalar(-1);
-  tryMoveEnemySideways(enemy, side, sideStep);
+  if (tryMoveEnemySideways(enemy, side, sideStep)) return;
+  tryMoveEnemyAlongAxes(enemy, side, sideStep);
 }
 
 function tryMoveEnemySideways(enemy, side, step) {
@@ -578,6 +588,27 @@ function tryMoveEnemySideways(enemy, side, step) {
   enemy.mesh.position.x = nextPosition.x;
   enemy.mesh.position.z = nextPosition.z;
   return true;
+}
+
+function tryMoveEnemyAlongAxes(enemy, direction, step) {
+  let moved = false;
+  const nextX = enemy.mesh.position.clone();
+  nextX.x += direction.x * step;
+
+  if (Math.abs(direction.x) > 0.001 && canOccupy(nextX, enemy.radius)) {
+    enemy.mesh.position.x = nextX.x;
+    moved = true;
+  }
+
+  const nextZ = enemy.mesh.position.clone();
+  nextZ.z += direction.z * step;
+
+  if (Math.abs(direction.z) > 0.001 && canOccupy(nextZ, enemy.radius)) {
+    enemy.mesh.position.z = nextZ.z;
+    moved = true;
+  }
+
+  return moved;
 }
 
 function damagePlayer(amount) {
