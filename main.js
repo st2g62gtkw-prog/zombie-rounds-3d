@@ -42,6 +42,7 @@ const POWER_UP_PICKUP_RANGE = 1.2;
 const DAMAGE_BOOST_TIME = 8000;
 const ENEMY_ATTACK_COOLDOWN = 850;
 const ENEMY_ATTACK_RANGE = 1.7;
+const SPAWN_OBSTACLE_CLEARANCE = 1.2;
 
 const ENEMY_TYPES = {
   normal: {
@@ -173,8 +174,8 @@ function initScene() {
   addObstacle(-14, 1, -13, 2.5, 2, 8);
   addObstacle(-9, 1, 8, 10, 2, 2.5);
   addObstacle(12, 1, -11, 2.5, 2, 12);
-  addObstacle(9, 1, 12, 8, 2, 2.5);
-  addObstacle(14, 1, 8.5, 2.5, 2, 9);
+  addObstacleBounds(6, 14.5, 11, 13.5);
+  addObstacleBounds(12, 14.5, 4, 13.5);
 }
 
 function addWall(x, y, z, width, height, depth) {
@@ -199,6 +200,14 @@ function addObstacle(x, y, z, width, height, depth) {
   obstacle.receiveShadow = true;
   scene.add(obstacle);
   obstacles.push({ x, z, halfX: width / 2, halfZ: depth / 2 });
+}
+
+function addObstacleBounds(minX, maxX, minZ, maxZ) {
+  const x = (minX + maxX) / 2;
+  const z = (minZ + maxZ) / 2;
+  const width = maxX - minX;
+  const depth = maxZ - minZ;
+  addObstacle(x, 1, z, width, 2, depth);
 }
 
 function loadBestScore() {
@@ -427,6 +436,8 @@ function createEnemyMesh(type) {
 }
 
 function findSpawnPoint(radius) {
+  const spawnRadius = radius + SPAWN_OBSTACLE_CLEARANCE;
+
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const edge = Math.floor(Math.random() * 4);
     const offset = randomBetween(-19, 19);
@@ -439,7 +450,7 @@ function findSpawnPoint(radius) {
 
     const farEnough = point.distanceTo(new THREE.Vector3(playerPosition.x, 0, playerPosition.z)) > 12;
 
-    if (farEnough && canOccupy(point, radius)) {
+    if (farEnough && canOccupy(point, spawnRadius)) {
       return point;
     }
   }
