@@ -43,6 +43,17 @@ const DAMAGE_BOOST_TIME = 8000;
 const ENEMY_ATTACK_COOLDOWN = 850;
 const ENEMY_ATTACK_RANGE = 1.7;
 const SPAWN_OBSTACLE_CLEARANCE = 1.2;
+const NAV_CELL_SIZE = 1;
+const NAV_MIN_X = -ARENA_LIMIT;
+const NAV_MIN_Z = -ARENA_LIMIT;
+const NAV_COLUMNS = Math.floor((ARENA_LIMIT * 2) / NAV_CELL_SIZE) + 1;
+const NAV_ROWS = NAV_COLUMNS;
+const NAV_RECALC_TIME = 0.35;
+const NAV_BLOCKED_RECALC_TIME = 0.55;
+const NAV_WAYPOINT_REACH = 0.3;
+const NAV_PATH_PADDING = 0.22;
+const NAV_DEBUG = true;
+const NAV_DEBUG_LINE_INTERVAL = 1500;
 
 const ENEMY_TYPES = {
   normal: {
@@ -143,6 +154,7 @@ let lastPauseChange = 0;
 let damageBoostActive = false;
 let damageBoostTimer = null;
 let damageFlashTimer = null;
+let nextEnemyId = 1;
 
 initScene();
 resetGame();
@@ -357,6 +369,7 @@ function spawnRound(roundNumber) {
     scene.add(mesh);
 
     enemies.push({
+      id: nextEnemyId,
       mesh,
       type: type.key,
       radius: type.radius,
@@ -364,8 +377,15 @@ function spawnRound(roundNumber) {
       points: type.points,
       speed: type.speed + roundNumber * 0.09,
       lastAttack: 0,
-      avoidSide: Math.random() < 0.5 ? -1 : 1,
+      path: [],
+      pathIndex: 0,
+      pathTimer: 0,
+      blockedTime: 0,
+      lastDirectClear: null,
+      lastLineDebugAt: 0,
+      lastTargetCellKey: "",
     });
+    nextEnemyId += 1;
   }
 
   updateHud();
@@ -528,21 +548,36 @@ function updateEnemies(delta) {
   if (paused || gameOver) return;
 
   for (const enemy of enemies) {
-    const toPlayer = new THREE.Vector3(
-      playerPosition.x - enemy.mesh.position.x,
-      0,
-      playerPosition.z - enemy.mesh.position.z,
-    );
-    const distance = toPlayer.length();
+    ensureEnemyNavigationState(enemy);
+    enemy.pathTimer = Math.max(0, enemy.pathTimer - delta);
+
+    const distance = getHorizontalDistance(enemy.mesh.position, playerPosition);
     const stopRange = PLAYER_RADIUS + enemy.radius + 0.15;
 
     enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z);
 
-    if (distance > stopRange) {
-      const step = Math.min(enemy.speed * delta, distance - stopRange);
-      const direction = toPlayer.normalize();
-      moveEnemy(enemy, direction, step);
+    if (distance <= stopRange) {
+      enemy.path = [];
+      enemy.pathIndex = 0;
+      enemy.blockedTime = 0;
+      continue;
     }
+
+    const directClear = isDirectPathClear(enemy.mesh.position, playerPosition, enemy.radius);
+    debugEnemyLineState(enemy, directClear);
+
+    const targetPosition = directClear
+      ? playerPosition
+      : getEnemyPathTarget(enemy, directClear);
+
+    if (!targetPosition) continue;
+
+    const maxStep = directClear
+      ? Math.min(enemy.speed * delta, distance - stopRange)
+      : enemy.speed * delta;
+    const movedDistance = moveEnemyTowardTarget(enemy, targetPosition, maxStep);
+
+    updateEnemyBlockedState(enemy, movedDistance, delta, directClear);
   }
 }
 
@@ -561,65 +596,375 @@ function checkEnemyAttacks() {
   }
 }
 
-function moveEnemy(enemy, direction, step) {
-  const startX = enemy.mesh.position.x;
-  const startZ = enemy.mesh.position.z;
-  const nextX = enemy.mesh.position.clone();
-  const nextZ = enemy.mesh.position.clone();
-
-  nextX.x += direction.x * step;
-  nextZ.z += direction.z * step;
-
-  // Mover por ejes separados permite deslizar contra obstaculos sin pathfinding.
-  if (canOccupy(nextX, enemy.radius)) enemy.mesh.position.x = nextX.x;
-  if (canOccupy(nextZ, enemy.radius)) enemy.mesh.position.z = nextZ.z;
-
-  const moved = Math.hypot(enemy.mesh.position.x - startX, enemy.mesh.position.z - startZ);
-  if (moved > step * 0.25) return;
-
-  const side = new THREE.Vector3(-direction.z * enemy.avoidSide, 0, direction.x * enemy.avoidSide);
-  const sideStep = step * 0.9;
-
-  if (tryMoveEnemySideways(enemy, side, sideStep)) return;
-  if (tryMoveEnemyAlongAxes(enemy, side, sideStep)) return;
-
-  enemy.avoidSide *= -1;
-  side.multiplyScalar(-1);
-  if (tryMoveEnemySideways(enemy, side, sideStep)) return;
-  tryMoveEnemyAlongAxes(enemy, side, sideStep);
+function ensureEnemyNavigationState(enemy) {
+  if (!Array.isArray(enemy.path)) enemy.path = [];
+  if (!Number.isFinite(enemy.pathIndex)) enemy.pathIndex = 0;
+  if (!Number.isFinite(enemy.pathTimer)) enemy.pathTimer = 0;
+  if (!Number.isFinite(enemy.blockedTime)) enemy.blockedTime = 0;
+  if (!Number.isFinite(enemy.lastLineDebugAt)) enemy.lastLineDebugAt = 0;
+  if (enemy.lastDirectClear === undefined) enemy.lastDirectClear = null;
+  if (!enemy.lastTargetCellKey) enemy.lastTargetCellKey = "";
 }
 
-function tryMoveEnemySideways(enemy, side, step) {
-  const nextPosition = enemy.mesh.position.clone();
-  nextPosition.x += side.x * step;
-  nextPosition.z += side.z * step;
+function getEnemyPathTarget(enemy, directClear) {
+  const navRadius = getEnemyNavigationRadius(enemy);
+  const targetCell = findNearestWalkableCell(worldToGrid(playerPosition), navRadius);
+  const targetCellKey = targetCell ? cellKey(targetCell) : "";
+  const needsPath = enemy.pathTimer <= 0 ||
+    enemy.path.length === 0 ||
+    enemy.pathIndex >= enemy.path.length ||
+    targetCellKey !== enemy.lastTargetCellKey;
 
-  if (!canOccupy(nextPosition, enemy.radius)) return false;
+  if (needsPath) {
+    recalculateEnemyPath(enemy, "intervalo", directClear);
+  }
+
+  return getEnemyCurrentWaypoint(enemy);
+}
+
+function recalculateEnemyPath(enemy, reason, directClear) {
+  const navRadius = getEnemyNavigationRadius(enemy);
+  const zombieCell = worldToGrid(enemy.mesh.position);
+  const playerCell = worldToGrid(playerPosition);
+  const startCell = findNearestWalkableCell(zombieCell, navRadius);
+  const targetCell = findNearestWalkableCell(playerCell, navRadius);
+  const path = startCell && targetCell ? findPath(startCell, targetCell, navRadius) : [];
+
+  enemy.path = path;
+  enemy.pathIndex = path.length > 1 ? 1 : 0;
+  enemy.pathTimer = NAV_RECALC_TIME;
+  enemy.lastTargetCellKey = targetCell ? cellKey(targetCell) : "";
+
+  debugEnemyPath(enemy, reason, directClear, zombieCell, playerCell, path);
+}
+
+function getEnemyNavigationRadius(enemy) {
+  return enemy.radius + NAV_PATH_PADDING;
+}
+
+function getEnemyCurrentWaypoint(enemy) {
+  while (enemy.pathIndex < enemy.path.length) {
+    const waypoint = gridToWorld(enemy.path[enemy.pathIndex].row, enemy.path[enemy.pathIndex].col);
+
+    if (getHorizontalDistance(enemy.mesh.position, waypoint) > NAV_WAYPOINT_REACH) {
+      return waypoint;
+    }
+
+    enemy.pathIndex += 1;
+  }
+
+  return null;
+}
+
+function moveEnemyTowardTarget(enemy, targetPosition, maxStep) {
+  const toTarget = new THREE.Vector3(
+    targetPosition.x - enemy.mesh.position.x,
+    0,
+    targetPosition.z - enemy.mesh.position.z,
+  );
+  const targetDistance = toTarget.length();
+
+  if (targetDistance <= 0.01 || maxStep <= 0) return 0;
+
+  const step = Math.min(maxStep, targetDistance);
+  const direction = toTarget.normalize();
+  const nextPosition = enemy.mesh.position.clone();
+  nextPosition.x += direction.x * step;
+  nextPosition.z += direction.z * step;
+
+  if (!canOccupy(nextPosition, enemy.radius)) return 0;
 
   enemy.mesh.position.x = nextPosition.x;
   enemy.mesh.position.z = nextPosition.z;
+  return step;
+}
+
+function updateEnemyBlockedState(enemy, movedDistance, delta, directClear) {
+  if (movedDistance > 0.01) {
+    enemy.blockedTime = 0;
+    return;
+  }
+
+  enemy.blockedTime += delta;
+
+  if (enemy.blockedTime < NAV_BLOCKED_RECALC_TIME) return;
+
+  enemy.blockedTime = 0;
+
+  if (!directClear) {
+    recalculateEnemyPath(enemy, "bloqueado", directClear);
+  }
+}
+
+function isDirectPathClear(startPosition, targetPosition, radius) {
+  return obstacles.every((obstacle) => !lineIntersectsExpandedObstacle(
+    startPosition,
+    targetPosition,
+    obstacle,
+    radius,
+  ));
+}
+
+function lineIntersectsExpandedObstacle(startPosition, targetPosition, obstacle, radius) {
+  const minX = obstacle.x - obstacle.halfX - radius;
+  const maxX = obstacle.x + obstacle.halfX + radius;
+  const minZ = obstacle.z - obstacle.halfZ - radius;
+  const maxZ = obstacle.z + obstacle.halfZ + radius;
+
+  return lineIntersectsRect(
+    startPosition.x,
+    startPosition.z,
+    targetPosition.x,
+    targetPosition.z,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+  );
+}
+
+function lineIntersectsRect(x1, z1, x2, z2, minX, maxX, minZ, maxZ) {
+  const directionX = x2 - x1;
+  const directionZ = z2 - z1;
+  const range = { min: 0, max: 1 };
+
+  return clipLineAxis(-directionX, x1 - minX, range) &&
+    clipLineAxis(directionX, maxX - x1, range) &&
+    clipLineAxis(-directionZ, z1 - minZ, range) &&
+    clipLineAxis(directionZ, maxZ - z1, range) &&
+    range.max >= range.min;
+}
+
+function clipLineAxis(direction, distanceToEdge, range) {
+  if (direction === 0) return distanceToEdge >= 0;
+
+  const ratio = distanceToEdge / direction;
+
+  if (direction < 0) {
+    if (ratio > range.max) return false;
+    if (ratio > range.min) range.min = ratio;
+  } else {
+    if (ratio < range.min) return false;
+    if (ratio < range.max) range.max = ratio;
+  }
+
   return true;
 }
 
-function tryMoveEnemyAlongAxes(enemy, direction, step) {
-  let moved = false;
-  const nextX = enemy.mesh.position.clone();
-  nextX.x += direction.x * step;
+function worldToGrid(position) {
+  return {
+    row: clampGridIndex(Math.round((position.z - NAV_MIN_Z) / NAV_CELL_SIZE), NAV_ROWS),
+    col: clampGridIndex(Math.round((position.x - NAV_MIN_X) / NAV_CELL_SIZE), NAV_COLUMNS),
+  };
+}
 
-  if (Math.abs(direction.x) > 0.001 && canOccupy(nextX, enemy.radius)) {
-    enemy.mesh.position.x = nextX.x;
-    moved = true;
+function gridToWorld(row, col) {
+  return new THREE.Vector3(
+    NAV_MIN_X + col * NAV_CELL_SIZE,
+    0,
+    NAV_MIN_Z + row * NAV_CELL_SIZE,
+  );
+}
+
+function isWalkable(row, col, radius = 0.5) {
+  if (!isInsideGrid(row, col)) return false;
+  return canOccupy(gridToWorld(row, col), radius);
+}
+
+function findPath(startCell, targetCell, radius = 0.5) {
+  const start = isWalkable(startCell.row, startCell.col, radius)
+    ? startCell
+    : findNearestWalkableCell(startCell, radius);
+  const target = isWalkable(targetCell.row, targetCell.col, radius)
+    ? targetCell
+    : findNearestWalkableCell(targetCell, radius);
+
+  if (!start || !target) return [];
+
+  const open = [{
+    cell: start,
+    gScore: 0,
+    fScore: getGridHeuristic(start, target),
+  }];
+  const cameFrom = new Map();
+  const gScores = new Map([[cellKey(start), 0]]);
+  const closed = new Set();
+
+  while (open.length > 0) {
+    open.sort((first, second) => first.fScore - second.fScore);
+    const current = open.shift().cell;
+    const currentKey = cellKey(current);
+
+    if (sameCell(current, target)) {
+      return reconstructPath(cameFrom, current);
+    }
+
+    if (closed.has(currentKey)) continue;
+    closed.add(currentKey);
+
+    for (const neighbor of getWalkableNeighbors(current, radius)) {
+      const neighborKey = cellKey(neighbor);
+      if (closed.has(neighborKey)) continue;
+
+      const tentativeGScore = gScores.get(currentKey) + getMoveCost(current, neighbor);
+      const knownGScore = gScores.get(neighborKey);
+
+      if (knownGScore !== undefined && tentativeGScore >= knownGScore) continue;
+
+      cameFrom.set(neighborKey, current);
+      gScores.set(neighborKey, tentativeGScore);
+      open.push({
+        cell: neighbor,
+        gScore: tentativeGScore,
+        fScore: tentativeGScore + getGridHeuristic(neighbor, target),
+      });
+    }
   }
 
-  const nextZ = enemy.mesh.position.clone();
-  nextZ.z += direction.z * step;
+  return [];
+}
 
-  if (Math.abs(direction.z) > 0.001 && canOccupy(nextZ, enemy.radius)) {
-    enemy.mesh.position.z = nextZ.z;
-    moved = true;
+function findNearestWalkableCell(cell, radius = 0.5) {
+  if (!cell) return null;
+
+  const start = {
+    row: clampGridIndex(cell.row, NAV_ROWS),
+    col: clampGridIndex(cell.col, NAV_COLUMNS),
+  };
+  const queue = [start];
+  const visited = new Set([cellKey(start)]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (isWalkable(current.row, current.col, radius)) return current;
+
+    for (const neighbor of getGridNeighbors(current)) {
+      const key = cellKey(neighbor);
+      if (visited.has(key)) continue;
+
+      visited.add(key);
+      queue.push(neighbor);
+    }
   }
 
-  return moved;
+  return null;
+}
+
+function getWalkableNeighbors(cell, radius) {
+  return getGridNeighbors(cell).filter((neighbor) => {
+    if (!isWalkable(neighbor.row, neighbor.col, radius)) return false;
+
+    const rowDelta = neighbor.row - cell.row;
+    const colDelta = neighbor.col - cell.col;
+
+    if (rowDelta !== 0 && colDelta !== 0) {
+      return isWalkable(cell.row, cell.col + colDelta, radius) &&
+        isWalkable(cell.row + rowDelta, cell.col, radius);
+    }
+
+    return true;
+  });
+}
+
+function getGridNeighbors(cell) {
+  const directions = [
+    { row: -1, col: 0 },
+    { row: 1, col: 0 },
+    { row: 0, col: -1 },
+    { row: 0, col: 1 },
+    { row: -1, col: -1 },
+    { row: -1, col: 1 },
+    { row: 1, col: -1 },
+    { row: 1, col: 1 },
+  ];
+
+  return directions
+    .map((direction) => ({
+      row: cell.row + direction.row,
+      col: cell.col + direction.col,
+    }))
+    .filter((neighbor) => isInsideGrid(neighbor.row, neighbor.col));
+}
+
+function getMoveCost(first, second) {
+  const diagonal = first.row !== second.row && first.col !== second.col;
+  return diagonal ? Math.SQRT2 : 1;
+}
+
+function getGridHeuristic(first, second) {
+  const rowDistance = Math.abs(first.row - second.row);
+  const colDistance = Math.abs(first.col - second.col);
+  const straight = Math.abs(rowDistance - colDistance);
+  const diagonal = Math.min(rowDistance, colDistance);
+  return straight + diagonal * Math.SQRT2;
+}
+
+function reconstructPath(cameFrom, currentCell) {
+  const path = [currentCell];
+  let currentKey = cellKey(currentCell);
+
+  while (cameFrom.has(currentKey)) {
+    const previous = cameFrom.get(currentKey);
+    path.unshift(previous);
+    currentKey = cellKey(previous);
+  }
+
+  return path;
+}
+
+function isInsideGrid(row, col) {
+  return row >= 0 && row < NAV_ROWS && col >= 0 && col < NAV_COLUMNS;
+}
+
+function clampGridIndex(value, size) {
+  return Math.max(0, Math.min(size - 1, value));
+}
+
+function sameCell(first, second) {
+  return first.row === second.row && first.col === second.col;
+}
+
+function cellKey(cell) {
+  return `${cell.row},${cell.col}`;
+}
+
+function formatCell(cell) {
+  return cell ? { row: cell.row, col: cell.col } : null;
+}
+
+function debugEnemyLineState(enemy, directClear) {
+  if (!NAV_DEBUG) return;
+
+  const now = performance.now();
+  const shouldLog = enemy.lastDirectClear !== directClear ||
+    now - enemy.lastLineDebugAt >= NAV_DEBUG_LINE_INTERVAL;
+
+  if (!shouldLog) return;
+
+  enemy.lastDirectClear = directClear;
+  enemy.lastLineDebugAt = now;
+
+  console.log("[ZombieNav] linea directa", {
+    zombieId: enemy.id,
+    zombieCell: formatCell(worldToGrid(enemy.mesh.position)),
+    playerCell: formatCell(worldToGrid(playerPosition)),
+    directClear,
+  });
+}
+
+function debugEnemyPath(enemy, reason, directClear, zombieCell, playerCell, path) {
+  if (!NAV_DEBUG) return;
+
+  console.log("[ZombieNav] ruta calculada", {
+    zombieId: enemy.id,
+    reason,
+    zombieCell: formatCell(zombieCell),
+    playerCell: formatCell(playerCell),
+    directClear,
+    route: path.map(formatCell),
+    nextWaypoint: formatCell(path[enemy.pathIndex]),
+  });
 }
 
 function damagePlayer(amount) {
