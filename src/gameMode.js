@@ -53,7 +53,6 @@
 
     state.roundChanging = true;
     setStatus(GAME_STATUS.ROUND_TRANSITION);
-    window.ZR.powerUps.maybeSpawnPowerUp();
     state.round += 1;
     setRoundMessageText(`Ronda ${state.round}`);
     setRoundMessageVisible(true);
@@ -78,6 +77,7 @@
 
     state.lastPauseChange = performance.now();
     state.keys.clear();
+    state.isFireHeld = false;
     setStatus(GAME_STATUS.PAUSED);
     return true;
   }

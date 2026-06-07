@@ -3,7 +3,7 @@
     DAMAGE_BOOST_TIME,
     MAX_HEALTH,
     MAX_POWER_UPS,
-    POWER_UP_CHANCE,
+    POWER_UP_DROP_CHANCE,
     POWER_UP_DURATION,
     POWER_UP_PICKUP_RANGE,
     POWER_UP_TYPES,
@@ -17,26 +17,18 @@
   const { updateHud } = window.ZR.ui;
   const {
     getThree,
-    randomBetween,
   } = window.ZR.utils;
   const { refillAmmo } = window.ZR.weapons;
   const THREE = getThree();
 
-  function maybeSpawnPowerUp() {
-    if (state.powerUps.length >= MAX_POWER_UPS || Math.random() > POWER_UP_CHANCE) return;
+  function maybeDropPowerUp(sourcePosition) {
+    if (state.powerUps.length >= MAX_POWER_UPS || Math.random() >= POWER_UP_DROP_CHANCE) return false;
 
-    const typeKeys = Object.keys(POWER_UP_TYPES);
-    const type = POWER_UP_TYPES[typeKeys[Math.floor(Math.random() * typeKeys.length)]];
-    const position = findPowerUpPoint();
-    const mesh = createPowerUpMesh(type);
-    mesh.position.set(position.x, 0.45, position.z);
-    scene.add(mesh);
+    const position = findDropPoint(sourcePosition);
+    if (!position) return false;
 
-    state.powerUps.push({
-      mesh,
-      type: type.key,
-      expiresAt: performance.now() + POWER_UP_DURATION,
-    });
+    spawnRandomPowerUp(position);
+    return true;
   }
 
   function updatePowerUps() {
@@ -104,18 +96,36 @@
     return mesh;
   }
 
-  function findPowerUpPoint() {
-    for (let attempt = 0; attempt < 80; attempt += 1) {
-      const point = new THREE.Vector3(randomBetween(-18, 18), 0, randomBetween(-18, 18));
-      const playerFlat = new THREE.Vector3(state.playerPosition.x, 0, state.playerPosition.z);
-      const farEnough = point.distanceTo(playerFlat) > 5;
+  function spawnRandomPowerUp(position) {
+    const typeKeys = Object.keys(POWER_UP_TYPES);
+    const type = POWER_UP_TYPES[typeKeys[Math.floor(Math.random() * typeKeys.length)]];
+    const mesh = createPowerUpMesh(type);
+    mesh.position.set(position.x, 0.45, position.z);
+    scene.add(mesh);
 
-      if (farEnough && canOccupy(point, 0.5)) {
-        return point;
-      }
-    }
+    state.powerUps.push({
+      mesh,
+      type: type.key,
+      expiresAt: performance.now() + POWER_UP_DURATION,
+    });
+  }
 
-    return new THREE.Vector3(0, 0, -8);
+  function findDropPoint(sourcePosition) {
+    const origin = new THREE.Vector3(sourcePosition.x, 0, sourcePosition.z);
+    const candidates = [
+      origin,
+      ...Array.from({ length: 10 }, (_, index) => {
+        const angle = (Math.PI * 2 * index) / 10;
+        const distance = index < 5 ? 0.75 : 1.35;
+        return new THREE.Vector3(
+          origin.x + Math.cos(angle) * distance,
+          0,
+          origin.z + Math.sin(angle) * distance,
+        );
+      }),
+    ];
+
+    return candidates.find((candidate) => canOccupy(candidate, 0.5)) || null;
   }
 
   function applyPowerUp(type) {
@@ -145,7 +155,7 @@
   window.ZR.powerUps = {
     activateDamageBoost,
     clearPowerUps,
-    maybeSpawnPowerUp,
+    maybeDropPowerUp,
     updatePowerUps,
   };
 })();

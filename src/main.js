@@ -50,6 +50,7 @@
   const {
     reloadAmmo,
     resetWeapons,
+    updateAutomaticFire,
   } = window.ZR.weapons;
   const {
     resetInteractables,
@@ -91,7 +92,12 @@
     resetWeapons();
     resetInteractables();
     state.keys.clear();
-    state.playerPosition.set(0, PLAYER_HEIGHT, 7);
+    state.isFireHeld = false;
+    state.baseHeight = PLAYER_HEIGHT;
+    state.playerPosition.set(0, state.baseHeight, 7);
+    state.verticalVelocity = 0;
+    state.isGrounded = true;
+    state.jumpQueued = false;
     state.yaw = 0;
     state.pitch = 0;
     state.health = MAX_HEALTH;
@@ -153,6 +159,7 @@
     hideDamageFlash();
     state.reloading = false;
     state.damageBoostActive = false;
+    state.isFireHeld = false;
     setGameOver();
     setPauseVisible(false);
     setRoundMessageVisible(false);
@@ -174,6 +181,7 @@
     // Loop principal: cada sistema actualiza solo si la partida esta activa.
     if (state.gameStarted && !state.gameOver && !state.paused) {
       updatePlayer(delta);
+      updateAutomaticFire();
       updatePowerUps();
       updateEnemies(delta);
       checkEnemyAttacks(damagePlayer);

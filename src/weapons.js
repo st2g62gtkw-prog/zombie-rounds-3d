@@ -1,5 +1,9 @@
 (() => {
-  const { WEAPONS } = window.ZR.config;
+  const {
+    ENABLE_WEAPON_VIEWMODEL,
+    HEADSHOT_MULTIPLIER,
+    WEAPONS,
+  } = window.ZR.config;
   const {
     clearReloadTimer,
     state,
@@ -16,6 +20,9 @@
   } = window.ZR.ui;
   const { getThree } = window.ZR.utils;
   const THREE = getThree();
+  const viewModel = {
+    group: null,
+  };
 
   function resetWeapons(playerId = state.localPlayerId) {
     const player = getPlayer(playerId);
@@ -27,6 +34,7 @@
     state.activeWeaponId = "pistol";
     cancelReload();
     syncLegacyAmmoState(player);
+    updateWeaponViewModel(player.activeWeaponId);
   }
 
   function createWeaponState(weaponId) {
@@ -38,6 +46,7 @@
       name: definition.name,
       damage: definition.damage,
       fireRate: definition.fireRate,
+      automatic: Boolean(definition.automatic),
       magazineSize: definition.magazineSize,
       ammoInMagazine: definition.magazineSize,
       reserveAmmo: definition.reserveAmmo,
@@ -88,8 +97,16 @@
     player.activeWeaponId = weaponId;
     state.activeWeaponId = weaponId;
     syncLegacyAmmoState(player);
+    updateWeaponViewModel(weaponId);
     updateHud();
     return true;
+  }
+
+  function updateAutomaticFire(playerId = state.localPlayerId) {
+    const weapon = getActiveWeapon(playerId);
+
+    if (!state.isFireHeld || !weapon?.automatic) return false;
+    return shoot({ playerId });
   }
 
   function switchWeapon(slotNumberOrId, playerId = state.localPlayerId) {
@@ -172,7 +189,10 @@
 
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
 
-    const hitBoxes = state.enemies.map((enemy) => enemy.mesh.userData.hitBox);
+    const hitBoxes = state.enemies.flatMap((enemy) => [
+      enemy.mesh.userData.headHitBox,
+      enemy.mesh.userData.hitBox,
+    ].filter(Boolean));
     const hits = raycaster.intersectObjects(hitBoxes, false);
     const targetPoint = hits[0]?.point ?? raycaster.ray.at(raycaster.far, new THREE.Vector3());
 
@@ -180,15 +200,19 @@
 
     if (!hits.length) return true;
 
-    const enemyGroup = hits[0].object.parent;
+    const hitObject = hits[0].object;
+    const enemyGroup = hitObject.userData.enemyGroup || hitObject.parent;
     const enemyIndex = state.enemies.findIndex((enemy) => enemy.mesh === enemyGroup);
     if (enemyIndex === -1) return true;
 
     const enemy = state.enemies[enemyIndex];
-    const damage = state.damageBoostActive ? weapon.damage * 2 : weapon.damage;
+    const isHeadshot = hitObject.userData.hitZone === "head" ||
+      isHeadshotByHeight(enemy, hits[0].point);
+    const boostedDamage = state.damageBoostActive ? weapon.damage * 2 : weapon.damage;
+    const damage = isHeadshot ? boostedDamage * HEADSHOT_MULTIPLIER : boostedDamage;
 
     if (window.ZR.actions?.damageZombie) {
-      window.ZR.actions.damageZombie(enemy, damage, playerId);
+      window.ZR.actions.damageZombie(enemy, damage, playerId, { isHeadshot });
       return true;
     }
 
@@ -208,13 +232,7 @@
     if (!weapon) return false;
 
     weapon.reserveAmmo = weapon.maxReserveAmmo;
-
-    if (weapon.ammoInMagazine < weapon.magazineSize) {
-      const neededAmmo = weapon.magazineSize - weapon.ammoInMagazine;
-      const loadedAmmo = Math.min(neededAmmo, weapon.reserveAmmo);
-      weapon.ammoInMagazine += loadedAmmo;
-      weapon.reserveAmmo -= loadedAmmo;
-    }
+    weapon.ammoInMagazine = weapon.magazineSize;
 
     syncLegacyAmmoState(getPlayer(playerId));
     updateHud();
@@ -255,6 +273,93 @@
     }, 70);
   }
 
+  function isHeadshotByHeight(enemy, hitPoint) {
+    if (!enemy?.mesh || !hitPoint) return false;
+
+    const type = window.ZR.config.ENEMY_TYPES[enemy.type];
+    const scale = type?.scale || 1;
+    const localHeight = (hitPoint.y - enemy.mesh.position.y) / scale;
+
+    return localHeight >= 1.08;
+  }
+
+  function updateWeaponViewModel(weaponId = state.activeWeaponId) {
+    if (!ENABLE_WEAPON_VIEWMODEL || !THREE) return;
+
+    if (!camera.parent) scene.add(camera);
+
+    if (viewModel.group) {
+      camera.remove(viewModel.group);
+      disposeObject(viewModel.group);
+      viewModel.group = null;
+    }
+
+    const group = weaponId === "rifle" ? createRifleViewModel() : createPistolViewModel();
+    group.position.set(0.42, -0.36, -0.82);
+    group.rotation.set(-0.05, -0.08, 0);
+    camera.add(group);
+    viewModel.group = group;
+  }
+
+  function createPistolViewModel() {
+    const group = new THREE.Group();
+    const bodyMaterial = new THREE.MeshBasicMaterial({ color: 0x252c31 });
+    const metalMaterial = new THREE.MeshBasicMaterial({ color: 0x4d5960 });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.42), bodyMaterial);
+    body.position.set(0, 0, 0);
+    group.add(body);
+
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.3), metalMaterial);
+    barrel.position.set(0, 0.04, -0.28);
+    group.add(barrel);
+
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.3, 0.16), bodyMaterial.clone());
+    grip.position.set(0.02, -0.18, 0.14);
+    grip.rotation.x = -0.28;
+    group.add(grip);
+
+    return group;
+  }
+
+  function createRifleViewModel() {
+    const group = new THREE.Group();
+    const bodyMaterial = new THREE.MeshBasicMaterial({ color: 0x263139 });
+    const accentMaterial = new THREE.MeshBasicMaterial({ color: 0x59666d });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.82), bodyMaterial);
+    body.position.set(0, 0, -0.14);
+    group.add(body);
+
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), accentMaterial);
+    barrel.position.set(0, 0.03, -0.78);
+    group.add(barrel);
+
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.13, 0.34), bodyMaterial.clone());
+    stock.position.set(0, -0.02, 0.42);
+    group.add(stock);
+
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.32, 0.16), accentMaterial.clone());
+    grip.position.set(0, -0.21, 0.08);
+    grip.rotation.x = -0.22;
+    group.add(grip);
+
+    return group;
+  }
+
+  function disposeObject(object) {
+    object.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((material) => material.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+  }
+
   window.ZR.weapons = {
     addWeapon,
     buyWeaponAmmo,
@@ -268,5 +373,7 @@
     setActiveWeapon,
     shoot,
     switchWeapon,
+    updateAutomaticFire,
+    updateWeaponViewModel,
   };
 })();

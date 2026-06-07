@@ -57,6 +57,13 @@
         return;
       }
 
+      if (event.code === "Space") {
+        if (!state.gameStarted || state.gameOver || state.paused) return;
+        event.preventDefault();
+        if (!event.repeat) state.jumpQueued = true;
+        return;
+      }
+
       if (state.paused) return;
 
       state.keys.add(event.code);
@@ -77,9 +84,30 @@
     document.addEventListener("pointerlockchange", () => {
       setStartVisible(!state.gameStarted && !state.gameOver);
 
+      if (document.pointerLockElement !== elements.canvas) {
+        state.isFireHeld = false;
+      }
+
       if (state.gameStarted && !state.gameOver && !state.paused && document.pointerLockElement !== elements.canvas) {
         pauseGame();
       }
+    });
+
+    document.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 || event.target.closest("button")) return;
+      if (state.gameOver || !state.gameStarted || state.paused) return;
+
+      if (document.pointerLockElement !== elements.canvas) {
+        requestCanvasPointerLock();
+        return;
+      }
+
+      state.isFireHeld = true;
+      shoot();
+    });
+
+    document.addEventListener("mouseup", () => {
+      state.isFireHeld = false;
     });
 
     document.addEventListener("click", (event) => {
@@ -90,10 +118,7 @@
 
       if (document.pointerLockElement !== elements.canvas) {
         requestCanvasPointerLock();
-        return;
       }
-
-      shoot();
     });
 
     elements.playButton.addEventListener("click", (event) => {

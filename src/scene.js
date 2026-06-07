@@ -1,5 +1,4 @@
 (() => {
-  const { PLAYER_HEIGHT } = window.ZR.config;
   const { state } = window.ZR.gameState;
   const { buildMap } = window.ZR.map;
   const { elements } = window.ZR.ui;
@@ -48,7 +47,6 @@
   }
 
   function updateCamera() {
-    state.playerPosition.y = PLAYER_HEIGHT;
     camera.position.copy(state.playerPosition);
     camera.rotation.set(state.pitch, state.yaw, 0);
   }

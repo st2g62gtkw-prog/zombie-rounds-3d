@@ -116,11 +116,15 @@
     return window.ZR.weapons.switchWeapon(slotOrWeaponId, playerId);
   }
 
-  function damageZombie(enemy, amount, playerId = state.localPlayerId) {
+  function damageZombie(enemy, amount, playerId = state.localPlayerId, options = {}) {
     if (!enemy || amount <= 0) return false;
 
     window.ZR.economy.addHitPoints(playerId);
     enemy.health -= amount;
+
+    if (options.isHeadshot) {
+      window.ZR.ui.showStatusMessage("Headshot", 900);
+    }
 
     if (enemy.health <= 0) {
       killZombie(enemy, playerId);
@@ -136,8 +140,10 @@
     const enemyIndex = state.enemies.indexOf(enemy);
     if (enemyIndex === -1) return false;
 
+    const dropPosition = enemy.mesh.position.clone();
     window.ZR.scene.scene.remove(enemy.mesh);
     state.enemies.splice(enemyIndex, 1);
+    window.ZR.powerUps.maybeDropPowerUp(dropPosition);
     window.ZR.economy.addKillPoints(enemy.points, playerId);
     window.ZR.ui.showScorePopup(enemy.points);
     window.ZR.ui.updateHud();

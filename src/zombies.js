@@ -15,7 +15,10 @@
     ROUND_SPEED_BONUS,
     SPAWN_OBSTACLE_CLEARANCE,
   } = window.ZR.config;
-  const { canOccupy } = window.ZR.collision;
+  const {
+    canOccupy,
+    getGroundHeightAt,
+  } = window.ZR.collision;
   const { state } = window.ZR.gameState;
   const {
     cellKey,
@@ -43,7 +46,7 @@
       const type = ENEMY_TYPES[typeKey];
       const spawn = findSpawnPoint(type.radius);
       const mesh = createEnemyMesh(type);
-      mesh.position.set(spawn.x, type.spawnY, spawn.z);
+      mesh.position.set(spawn.x, type.spawnY + getGroundHeightAt(spawn), spawn.z);
       scene.add(mesh);
 
       state.enemies.push({
@@ -52,6 +55,8 @@
         type: type.key,
         radius: type.radius,
         health: type.health,
+        attackDamage: type.attackDamage,
+        baseY: type.spawnY,
         points: type.points,
         speed: type.speed + roundNumber * ROUND_SPEED_BONUS,
         lastAttack: 0,
@@ -72,6 +77,7 @@
 
     for (const enemy of state.enemies) {
       ensureEnemyNavigationState(enemy);
+      updateEnemyGroundHeight(enemy);
       enemy.pathTimer = Math.max(0, enemy.pathTimer - delta);
 
       const distance = getHorizontalDistance(enemy.mesh.position, state.playerPosition);
@@ -99,6 +105,7 @@
         ? Math.min(enemy.speed * delta, distance - stopRange)
         : enemy.speed * delta;
       const movedDistance = moveEnemyTowardTarget(enemy, targetPosition, maxStep);
+      updateEnemyGroundHeight(enemy);
 
       updateEnemyBlockedState(enemy, movedDistance, delta, directClear);
     }
@@ -114,7 +121,7 @@
 
       if (currentDistance <= ENEMY_ATTACK_RANGE && now - enemy.lastAttack > ENEMY_ATTACK_COOLDOWN) {
         enemy.lastAttack = now;
-        damagePlayer(10);
+        damagePlayer(enemy.attackDamage ?? 10);
       }
     }
   }
@@ -145,14 +152,27 @@
     head.position.y = 1.25;
     enemy.add(head);
 
-    // El grupo completo recibe el raycast gracias a esta caja invisible simple.
+    const hitBoxMaterial = new THREE.MeshBasicMaterial({ visible: false });
+
     const hitBox = new THREE.Mesh(
-      new THREE.BoxGeometry(0.9, 1.8, 0.9),
-      new THREE.MeshBasicMaterial({ visible: false }),
+      new THREE.BoxGeometry(0.9, 1.15, 0.9),
+      hitBoxMaterial,
     );
-    hitBox.position.y = 0.75;
+    hitBox.position.y = 0.58;
+    hitBox.userData.enemyGroup = enemy;
+    hitBox.userData.hitZone = "body";
     enemy.add(hitBox);
     enemy.userData.hitBox = hitBox;
+
+    const headHitBox = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.62, 0.72),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    headHitBox.position.y = 1.32;
+    headHitBox.userData.enemyGroup = enemy;
+    headHitBox.userData.hitZone = "head";
+    enemy.add(headHitBox);
+    enemy.userData.headHitBox = headHitBox;
 
     return enemy;
   }
@@ -292,6 +312,15 @@
     enemy.mesh.position.x = nextPosition.x;
     enemy.mesh.position.z = nextPosition.z;
     return step;
+  }
+
+  function updateEnemyGroundHeight(enemy) {
+    const targetY = (enemy.baseY ?? 0.8) + getGroundHeightAt(enemy.mesh.position);
+    enemy.mesh.position.y += (targetY - enemy.mesh.position.y) * 0.35;
+
+    if (Math.abs(targetY - enemy.mesh.position.y) < 0.01) {
+      enemy.mesh.position.y = targetY;
+    }
   }
 
   function updateEnemyBlockedState(enemy, movedDistance, delta, directClear) {

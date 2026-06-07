@@ -25,8 +25,6 @@
     slot2: document.querySelector("#slot2"),
     slot1Name: document.querySelector("#slot1Name"),
     slot2Name: document.querySelector("#slot2Name"),
-    slot1Ammo: document.querySelector("#slot1Ammo"),
-    slot2Ammo: document.querySelector("#slot2Ammo"),
     damageFlash: document.querySelector("#damageFlash"),
     scorePopups: document.querySelector("#scorePopups"),
     interactionPrompt: document.querySelector("#interactionPrompt"),
@@ -157,17 +155,16 @@
   }
 
   function updateWeaponSlots(player) {
-    updateSlot(elements.slot1, elements.slot1Name, elements.slot1Ammo, player, 0);
-    updateSlot(elements.slot2, elements.slot2Name, elements.slot2Ammo, player, 1);
+    updateSlot(elements.slot1, elements.slot1Name, player, 0);
+    updateSlot(elements.slot2, elements.slot2Name, player, 1);
   }
 
-  function updateSlot(slotElement, nameElement, ammoElement, player, slotIndex) {
+  function updateSlot(slotElement, nameElement, player, slotIndex) {
     const weaponId = player?.weaponSlots?.[slotIndex] || null;
     const weapon = weaponId ? player.weapons[weaponId] : null;
 
     slotElement.classList.toggle("active", Boolean(weapon && player.activeWeaponId === weapon.id));
     nameElement.textContent = weapon?.name || "Vacio";
-    ammoElement.textContent = weapon ? `${weapon.ammoInMagazine}/${weapon.reserveAmmo}` : "--";
   }
 
   window.ZR.ui = {

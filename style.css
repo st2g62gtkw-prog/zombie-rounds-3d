@@ -111,8 +111,8 @@ body {
 .hudSlots {
   bottom: 22px;
   left: 50%;
-  grid-template-columns: repeat(2, 118px);
-  gap: 8px;
+  grid-template-columns: repeat(2, 96px);
+  gap: 6px;
   transform: translateX(-50%);
   background: transparent;
   border: 0;
@@ -122,9 +122,11 @@ body {
 
 .weaponSlot {
   display: grid;
-  gap: 4px;
-  min-height: 74px;
-  padding: 9px 10px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 9px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   background: rgba(8, 11, 15, 0.74);
@@ -135,8 +137,11 @@ body {
   font-weight: 800;
 }
 
-.weaponSlot small {
-  color: #aeb9c4;
+.weaponSlot strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .weaponSlot.active {

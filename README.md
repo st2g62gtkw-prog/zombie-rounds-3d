@@ -6,6 +6,7 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 
 - Click en la pantalla para capturar el mouse.
 - WASD para moverte.
+- Espacio para saltar.
 - Mueve el mouse para mirar.
 - Click para disparar.
 - ESC o P para pausar o continuar.
@@ -30,15 +31,16 @@ La municion es finita: cada arma tiene cargador y reserva, y recargar transfiere
 
 ## Armas
 
-- Pistola: arma inicial, 12 balas en cargador y reserva limitada.
-- Rifle: arma comprable, cargador de 30 balas y reserva mayor.
-- El HUD muestra arma activa, cargador, reserva y slots 1/2.
+- Pistola: arma inicial semiautomatica, 12 balas en cargador y reserva limitada.
+- Rifle: arma comprable automatica, cargador de 60 balas, reserva de 240 y cadencia alta controlada.
+- Los impactos a la cabeza hacen dano critico y muestran un feedback simple.
+- El HUD muestra arma activa, cargador, reserva y slots 1/2. Los slots no muestran municion.
 
 ## Enemigos
 
 - Zombie normal: velocidad media, 1 disparo, 100 puntos.
-- Zombie rapido: mas pequeno y veloz, aparece desde ronda 3, 150 puntos.
-- Zombie pesado: mas grande y lento, necesita 3 disparos, aparece desde ronda 5, 250 puntos.
+- Zombie rapido: mas pequeno, mas veloz y con menos vida, aparece desde ronda 3, 150 puntos.
+- Zombie pesado: mas grande y lento, golpea mas fuerte, aparece desde ronda 5, 250 puntos.
 
 ## Power-ups
 
@@ -46,11 +48,11 @@ La municion es finita: cada arma tiene cargador y reserva, y recargar transfiere
 - Municion: rellena la reserva y el cargador del arma activa.
 - Dano aumentado: los disparos hacen doble dano durante 8 segundos.
 
-Al terminar una ronda puede aparecer un power-up. Como maximo hay 2 activos y desaparecen si no se recogen a tiempo.
+Al eliminar un zombie existe una probabilidad baja de que deje un power-up. Como maximo hay 2 activos y desaparecen si no se recogen a tiempo.
 
 ## Presentacion
 
-El mapa usa suelo, muros y pocos obstaculos grandes hechos con geometrias basicas. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
+El mapa usa suelo, muros, pocos obstaculos grandes y una plataforma elevada de prueba con dos rampas. La plataforma tiene superficies caminables con altura y laterales solidos simples. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
 
 ## Ejecutar localmente
 
