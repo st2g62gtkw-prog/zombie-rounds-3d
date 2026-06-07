@@ -6,7 +6,6 @@
   const {
     clearReloadTimer,
     state,
-    updateBestScore,
   } = window.ZR.gameState;
   const {
     camera,
@@ -15,7 +14,6 @@
   } = window.ZR.scene;
   const {
     elements,
-    showScorePopup,
     updateHud,
   } = window.ZR.ui;
   const { getThree } = window.ZR.utils;
@@ -43,7 +41,7 @@
     }, RELOAD_TIME);
   }
 
-  function shoot() {
+  function shoot({ playerId = state.localPlayerId } = {}) {
     if (
       !state.gameStarted ||
       state.gameOver ||
@@ -72,20 +70,24 @@
     const enemyGroup = hits[0].object.parent;
     const enemyIndex = state.enemies.findIndex((enemy) => enemy.mesh === enemyGroup);
 
-    if (enemyIndex !== -1) {
-      const enemy = state.enemies[enemyIndex];
-      enemy.health -= state.damageBoostActive ? 2 : 1;
+    if (enemyIndex === -1) return;
 
-      if (enemy.health <= 0) {
-        scene.remove(enemyGroup);
-        state.enemies.splice(enemyIndex, 1);
-        state.score += enemy.points;
-        showScorePopup(enemy.points);
-        updateBestScore();
-      }
+    const enemy = state.enemies[enemyIndex];
+    const damage = state.damageBoostActive ? 2 : 1;
 
-      updateHud();
+    if (window.ZR.actions?.damageZombie) {
+      window.ZR.actions.damageZombie(enemy, damage, playerId);
+      return;
     }
+
+    enemy.health -= damage;
+    if (enemy.health <= 0) {
+      scene.remove(enemyGroup);
+      state.enemies.splice(enemyIndex, 1);
+      state.score += enemy.points;
+    }
+
+    updateHud();
   }
 
   function drawShot(targetPoint) {

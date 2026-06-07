@@ -8,6 +8,7 @@
 
   function setupInput({
     pauseGame,
+    interact,
     reloadAmmo,
     resetGame,
     resumeGame,
@@ -36,6 +37,12 @@
 
       if (event.code === "KeyR") {
         reloadAmmo();
+        return;
+      }
+
+      if (event.code === "KeyE") {
+        if (!state.gameStarted || state.gameOver || state.paused) return;
+        interact();
         return;
       }
 

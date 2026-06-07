@@ -19,6 +19,7 @@
     damageBoostValue: document.querySelector("#damageBoostValue"),
     damageFlash: document.querySelector("#damageFlash"),
     scorePopups: document.querySelector("#scorePopups"),
+    interactionPrompt: document.querySelector("#interactionPrompt"),
     startMessage: document.querySelector("#startMessage"),
     gameOverMessage: document.querySelector("#gameOverMessage"),
     pauseMessage: document.querySelector("#pauseMessage"),
@@ -41,6 +42,11 @@
     elements.maxAmmoValue.textContent = MAX_AMMO;
     elements.reloadStatus.textContent = state.reloading ? " (recargando)" : "";
     elements.damageBoostValue.textContent = state.damageBoostActive ? "x2" : "Normal";
+  }
+
+  function setInteractionPrompt(text) {
+    elements.interactionPrompt.textContent = text;
+    elements.interactionPrompt.classList.toggle("hidden", !text);
   }
 
   function showDamageFlash() {
@@ -115,6 +121,7 @@
     hideDamageFlash,
     requestCanvasPointerLock,
     setGameOverVisible,
+    setInteractionPrompt,
     setPauseVisible,
     setRoundMessageText,
     setRoundMessageVisible,

@@ -99,6 +99,24 @@ body {
   pointer-events: none;
 }
 
+.interactionPrompt {
+  position: fixed;
+  bottom: 42px;
+  left: 50%;
+  z-index: 6;
+  max-width: min(90vw, 520px);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(11, 14, 18, 0.78);
+  color: #f4f8fb;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .scorePopup {
   position: fixed;
   top: 46%;

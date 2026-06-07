@@ -35,8 +35,8 @@
   } = window.ZR.utils;
   const THREE = getThree();
 
-  function spawnRound(roundNumber) {
-    const amount = ROUND_BASE_ENEMIES + (roundNumber - 1) * ROUND_ENEMY_GROWTH;
+  function spawnRound(roundNumber, enemyCount) {
+    const amount = enemyCount ?? ROUND_BASE_ENEMIES + (roundNumber - 1) * ROUND_ENEMY_GROWTH;
     const enemyTypes = buildRoundEnemyTypes(roundNumber, amount);
 
     for (const typeKey of enemyTypes) {

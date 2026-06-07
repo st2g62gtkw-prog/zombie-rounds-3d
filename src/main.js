@@ -1,23 +1,29 @@
 (() => {
   const {
-    GAME_STATUS,
     MAX_AMMO,
     MAX_HEALTH,
     PLAYER_HEIGHT,
-    ROUND_MESSAGE_TIME,
   } = window.ZR.config;
   const {
     clearDamageBoostTimer,
     clearReloadTimer,
-    clearRoundTimer,
     state,
     updateBestScore,
   } = window.ZR.gameState;
+  const { resetEconomy } = window.ZR.economy;
+  const {
+    pause,
+    resetGameMode,
+    resume,
+    setGameOver,
+    startRound,
+    updateRoundState,
+  } = window.ZR.gameMode;
   const { setupInput } = window.ZR.input;
+  const { performAction } = window.ZR.localSession;
   const { updatePlayer } = window.ZR.player;
   const {
     clearPowerUps,
-    maybeSpawnPowerUp,
     updatePowerUps,
   } = window.ZR.powerUps;
   const {
@@ -33,33 +39,35 @@
     hideDamageFlash,
     requestCanvasPointerLock,
     setGameOverVisible,
+    setInteractionPrompt,
     setPauseVisible,
-    setRoundMessageText,
     setRoundMessageVisible,
     setStartVisible,
     showDamageFlash,
     showGameOverStats,
     updateHud,
   } = window.ZR.ui;
+  const { EVENTS } = window.ZR.protocol;
+  const { reloadAmmo } = window.ZR.weapons;
   const {
-    reloadAmmo,
-    shoot,
-  } = window.ZR.weapons;
+    resetInteractables,
+    updateInteractablePrompt,
+  } = window.ZR.interactables;
   const {
     checkEnemyAttacks,
     clearEnemies,
-    spawnRound,
     updateEnemies,
   } = window.ZR.zombies;
 
   initScene();
   resetGame();
   setupInput({
+    interact: () => performAction({ type: EVENTS.INTERACT }),
     pauseGame,
     reloadAmmo,
     resetGame,
     resumeGame,
-    shoot,
+    shoot: () => performAction({ type: EVENTS.SHOOT }),
     startGame,
   });
   window.addEventListener("resize", resizeRenderer);
@@ -74,44 +82,35 @@
     clearEnemies();
     clearPowerUps();
     clearReloadTimer();
-    clearRoundTimer();
     clearDamageBoostTimer();
     hideDamageFlash();
+    resetEconomy();
+    resetInteractables();
     state.keys.clear();
     state.playerPosition.set(0, PLAYER_HEIGHT, 7);
     state.yaw = 0;
     state.pitch = 0;
     state.health = MAX_HEALTH;
-    state.round = 1;
-    state.score = 0;
+    state.players[state.localPlayerId].health = MAX_HEALTH;
     state.ammo = MAX_AMMO;
     state.reloading = false;
     state.damageBoostActive = false;
-    state.gameStarted = startNow;
-    state.gameOver = false;
-    state.roundChanging = false;
-    state.paused = false;
     state.nextEnemyId = 1;
+    resetGameMode(startNow);
     setPauseVisible(false);
-    setRoundMessageVisible(false);
-    setRoundMessageText("Ronda 1");
     setGameOverVisible(false);
     setStartVisible(!startNow);
 
-    if (startNow) spawnRound(state.round);
-    setGameStatus(startNow ? GAME_STATUS.PLAYING : GAME_STATUS.MENU);
+    if (startNow) startRound(state.round);
 
     updateHud();
     updateCamera();
   }
 
   function pauseGame() {
-    if (!state.gameStarted || state.gameOver || state.paused) return;
+    if (!pause()) return;
 
-    state.paused = true;
-    state.lastPauseChange = performance.now();
-    state.keys.clear();
-    setGameStatus(GAME_STATUS.PAUSED);
+    setInteractionPrompt("");
     setPauseVisible(true);
 
     if (document.pointerLockElement === elements.canvas) {
@@ -120,17 +119,15 @@
   }
 
   function resumeGame() {
-    if (!state.gameStarted || state.gameOver || !state.paused) return;
+    if (!resume()) return;
 
-    state.paused = false;
-    state.lastPauseChange = performance.now();
-    setGameStatus(state.roundChanging ? GAME_STATUS.ROUND_COMPLETE : GAME_STATUS.PLAYING);
     setPauseVisible(false);
     requestCanvasPointerLock();
   }
 
   function damagePlayer(amount) {
     state.health = Math.max(0, state.health - amount);
+    state.players[state.localPlayerId].health = state.health;
     showDamageFlash();
     updateHud();
 
@@ -145,15 +142,16 @@
     state.paused = false;
     state.roundChanging = false;
     state.health = 0;
+    state.players[state.localPlayerId].health = 0;
     clearReloadTimer();
-    clearRoundTimer();
     clearDamageBoostTimer();
     hideDamageFlash();
     state.reloading = false;
     state.damageBoostActive = false;
-    setGameStatus(GAME_STATUS.GAME_OVER);
+    setGameOver();
     setPauseVisible(false);
     setRoundMessageVisible(false);
+    setInteractionPrompt("");
     updateBestScore();
     updateHud();
     showGameOverStats();
@@ -174,37 +172,12 @@
       updatePowerUps();
       updateEnemies(delta);
       checkEnemyAttacks(damagePlayer);
-      checkRoundState();
+      updateRoundState();
+      updateInteractablePrompt();
       updateCamera();
     }
 
     renderer.render(scene, camera);
-  }
-
-  function checkRoundState() {
-    if (state.roundChanging || state.enemies.length > 0 || state.gameOver) return;
-
-    state.roundChanging = true;
-    setGameStatus(GAME_STATUS.ROUND_COMPLETE);
-    maybeSpawnPowerUp();
-    state.round += 1;
-    setRoundMessageText(`Ronda ${state.round}`);
-    setRoundMessageVisible(true);
-    updateHud();
-
-    state.roundTimer = window.setTimeout(() => {
-      if (state.gameOver || !state.gameStarted) return;
-      spawnRound(state.round);
-      setRoundMessageVisible(false);
-      state.roundChanging = false;
-      state.roundTimer = null;
-      if (!state.paused) setGameStatus(GAME_STATUS.PLAYING);
-      updateHud();
-    }, ROUND_MESSAGE_TIME);
-  }
-
-  function setGameStatus(status) {
-    state.status = status;
   }
 
   window.ZR.main = {

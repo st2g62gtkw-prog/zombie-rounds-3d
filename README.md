@@ -10,11 +10,20 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 - Click para disparar.
 - ESC o P para pausar o continuar.
 - R para recargar durante la partida.
+- E para interactuar con puertas o compras cercanas.
 - R para reiniciar despues de perder.
 - Elimina todos los enemigos para pasar a la siguiente ronda.
 
 El juego guarda el puntaje maximo en `localStorage`, por lo que el record queda en el navegador donde se juega.
 Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
+
+## Modo survival y economia
+
+- Las rondas y transiciones viven en `src/gameMode.js`.
+- Los puntos viven en `src/economy.js`.
+- El jugador gana puntos por impacto y por eliminar zombies.
+- Los puntos se pueden gastar en una puerta comprable y una compra simple de municion.
+- Las acciones locales pasan por `src/actions.js` y `src/multiplayer/localSession.js`, preparando el juego para multijugador futuro sin conectarse a ningun servidor todavia.
 
 ## Enemigos
 
@@ -57,6 +66,9 @@ Luego visita `http://localhost:8000`.
 - `main.js`: puente de compatibilidad para cargar los scripts de `src/`.
 - `src/config.js`: constantes de juego.
 - `src/gameState.js`: estado mutable compartido.
+- `src/gameMode.js`: estados de partida, rondas y transiciones.
+- `src/economy.js`: puntos, gastos y validacion de compras.
+- `src/actions.js`: acciones centrales de disparo, interaccion, compras y eliminaciones.
 - `src/scene.js`: escena, camara, renderer y luces.
 - `src/map.js`: muros y obstaculos del mapa.
 - `src/collision.js`: colisiones simples contra mapa.
@@ -66,6 +78,8 @@ Luego visita `http://localhost:8000`.
 - `src/pathfinding.js`: grilla, conversion X/Z y rutas A*.
 - `src/weapons.js`: disparos, municion y recarga.
 - `src/powerUps.js`: aparicion y efectos de power-ups.
+- `src/interactables.js`: puerta comprable y estacion de compra.
+- `src/multiplayer/`: base local sin red para eventos y sesion futura.
 - `src/ui.js`: HUD, mensajes y feedback visual.
 - `src/utils.js`: funciones auxiliares.
 - `README.md`: instrucciones del proyecto.
