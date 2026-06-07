@@ -121,6 +121,7 @@
   function applyPowerUp(type) {
     if (type === "heal") {
       state.health = Math.min(MAX_HEALTH, state.health + 25);
+      state.players[state.localPlayerId].health = state.health;
     }
 
     if (type === "ammo") {

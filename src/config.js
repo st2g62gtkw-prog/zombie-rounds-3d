@@ -8,7 +8,7 @@
     PLAYER_SPEED: 6,
     ARENA_LIMIT: 23,
     BEST_SCORE_KEY: "zombieRounds3D.bestScore",
-    MAX_AMMO: 8,
+    MAX_AMMO: 12,
     RELOAD_TIME: 1200,
     ROUND_MESSAGE_TIME: 1000,
     GAME_STATUS: {
@@ -25,7 +25,8 @@
     ROUND_SPEED_BONUS: 0.09,
     POINTS_PER_HIT: 10,
     DOOR_COST: 500,
-    AMMO_STATION_COST: 150,
+    AMMO_STATION_COST: 250,
+    WEAPON_STATION_COST: 750,
     INTERACT_RANGE: 2.4,
     POWER_UP_CHANCE: 0.65,
     MAX_POWER_UPS: 2,
@@ -48,6 +49,31 @@
   config.NAV_MIN_Z = -config.ARENA_LIMIT;
   config.NAV_COLUMNS = Math.floor((config.ARENA_LIMIT * 2) / config.NAV_CELL_SIZE) + 1;
   config.NAV_ROWS = config.NAV_COLUMNS;
+
+  config.WEAPONS = {
+    pistol: {
+      id: "pistol",
+      name: "Pistola",
+      damage: 1,
+      fireRate: 3.5,
+      magazineSize: 12,
+      reserveAmmo: 36,
+      maxReserveAmmo: 72,
+      reloadTime: 1.2,
+      cost: 0,
+    },
+    rifle: {
+      id: "rifle",
+      name: "Rifle",
+      damage: 1,
+      fireRate: 8,
+      magazineSize: 30,
+      reserveAmmo: 90,
+      maxReserveAmmo: 120,
+      reloadTime: 1.8,
+      cost: 750,
+    },
+  };
 
   config.ENEMY_TYPES = {
     normal: {

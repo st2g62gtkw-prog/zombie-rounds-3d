@@ -25,6 +25,14 @@
       return buyWeapon(normalizedAction.playerId, normalizedAction.targetId);
     }
 
+    if (normalizedAction.type === EVENTS.BUY_AMMO) {
+      return buyAmmo(normalizedAction.playerId, normalizedAction.targetId);
+    }
+
+    if (normalizedAction.type === EVENTS.SWITCH_WEAPON) {
+      return switchWeapon(normalizedAction.playerId, normalizedAction.slot ?? normalizedAction.weaponId);
+    }
+
     return false;
   }
 
@@ -40,7 +48,11 @@
       return buyDoor(playerId, interactable.id);
     }
 
-    if (interactable.type === "buyWeapon") {
+    if (interactable.actionType === EVENTS.BUY_AMMO || interactable.type === "ammo") {
+      return buyAmmo(playerId, interactable.id);
+    }
+
+    if (interactable.actionType === EVENTS.BUY_WEAPON || interactable.type === "weapon") {
       return buyWeapon(playerId, interactable.id);
     }
 
@@ -57,13 +69,51 @@
 
   function buyWeapon(playerId, targetId) {
     const station = window.ZR.interactables.findInteractable(targetId);
-    if (!station || station.type !== "buyWeapon") return false;
-    if (state.ammo >= window.ZR.config.MAX_AMMO) return false;
-    if (!window.ZR.economy.spendPoints(station.cost, playerId)) return false;
+    if (!station || station.type !== "weapon" || !station.weaponId) return false;
 
-    window.ZR.weapons.refillAmmo();
+    if (window.ZR.weapons.playerHasWeapon(station.weaponId, playerId)) {
+      window.ZR.ui.showStatusMessage(`Ya tienes ${window.ZR.config.WEAPONS[station.weaponId].name}`);
+      return false;
+    }
+
+    if (!window.ZR.economy.spendPoints(station.cost, playerId)) {
+      window.ZR.ui.showStatusMessage("Puntos insuficientes");
+      return false;
+    }
+
+    const weapon = window.ZR.weapons.addWeapon(station.weaponId, playerId);
+    window.ZR.ui.showStatusMessage(`${weapon.name} comprado`);
     window.ZR.ui.updateHud();
     return true;
+  }
+
+  function buyAmmo(playerId, targetId) {
+    const station = window.ZR.interactables.findInteractable(targetId);
+    if (!station || station.type !== "ammo") return false;
+
+    const weapon = window.ZR.weapons.getActiveWeapon(playerId);
+    const ammoIsFull = weapon &&
+      weapon.ammoInMagazine >= weapon.magazineSize &&
+      weapon.reserveAmmo >= weapon.maxReserveAmmo;
+
+    if (ammoIsFull) {
+      window.ZR.ui.showStatusMessage("Municion llena");
+      return false;
+    }
+
+    if (!window.ZR.economy.spendPoints(station.cost, playerId)) {
+      window.ZR.ui.showStatusMessage("Puntos insuficientes");
+      return false;
+    }
+
+    window.ZR.weapons.buyWeaponAmmo(playerId);
+    window.ZR.ui.showStatusMessage("Municion comprada");
+    window.ZR.ui.updateHud();
+    return true;
+  }
+
+  function switchWeapon(playerId, slotOrWeaponId) {
+    return window.ZR.weapons.switchWeapon(slotOrWeaponId, playerId);
   }
 
   function damageZombie(enemy, amount, playerId = state.localPlayerId) {
@@ -104,6 +154,7 @@
 
   window.ZR.actions = {
     buyDoor,
+    buyAmmo,
     buyWeapon,
     damageZombie,
     endRound,
@@ -112,5 +163,6 @@
     playerInteract,
     playerShoot,
     startRound,
+    switchWeapon,
   };
 })();

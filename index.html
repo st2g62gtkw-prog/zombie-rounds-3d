@@ -12,22 +12,60 @@
       <canvas id="gameCanvas"></canvas>
 
       <section id="hud" aria-label="Estado del juego">
-        <div>Vida: <span id="healthValue">100</span></div>
-        <div>Ronda: <span id="roundValue">1</span></div>
-        <div>Enemigos: <span id="enemyValue">0</span></div>
-        <div>Puntos: <span id="scoreValue">0</span></div>
-        <div>Record: <span id="bestScoreValue">0</span></div>
-        <div>
-          Balas: <span id="ammoValue">8</span> /
-          <span id="maxAmmoValue">8</span><span id="reloadStatus"></span>
+        <div id="healthPanel" class="hudPanel hudHealth">
+          <span class="hudLabel">Salud</span>
+          <div class="barTrack"><div id="healthBar" class="barFill healthFill"></div></div>
+          <strong><span id="healthValue">100</span>/100</strong>
         </div>
-        <div>Dano: <span id="damageBoostValue">Normal</span></div>
+
+        <div id="topStatsPanel" class="hudPanel hudTopStats">
+          <div><span class="hudLabel">Puntos</span><strong id="scoreValue">0</strong></div>
+          <div><span class="hudLabel">Ronda</span><strong id="roundValue">1</strong></div>
+          <div><span class="hudLabel">Zombies</span><strong id="enemyValue">0</strong></div>
+          <div><span class="hudLabel">Record</span><strong id="bestScoreValue">0</strong></div>
+        </div>
+
+        <div id="statusPanel" class="hudPanel hudStatus">
+          <span class="hudLabel">Sesion</span>
+          <strong>Local</strong>
+          <small>Co-op futuro</small>
+        </div>
+
+        <div id="wavePanel" class="hudPanel hudWave">
+          <span class="hudLabel">Oleada</span>
+          <strong id="waveValue">1</strong>
+        </div>
+
+        <div id="weaponSlotsPanel" class="hudPanel hudSlots">
+          <div id="slot1" class="weaponSlot active">
+            <span>1</span>
+            <strong id="slot1Name">Pistola</strong>
+            <small id="slot1Ammo">12/36</small>
+          </div>
+          <div id="slot2" class="weaponSlot">
+            <span>2</span>
+            <strong id="slot2Name">Vacio</strong>
+            <small id="slot2Ammo">--</small>
+          </div>
+        </div>
+
+        <div id="weaponPanel" class="hudPanel hudWeapon">
+          <span class="hudLabel">Arma</span>
+          <strong id="weaponNameValue">Pistola</strong>
+          <div class="ammoLine">
+            <span id="ammoValue">12</span>
+            <span>/</span>
+            <span id="maxAmmoValue">36</span>
+          </div>
+          <small><span id="reloadStatus"></span><span id="damageBoostValue">Normal</span></small>
+        </div>
       </section>
 
       <div id="crosshair" aria-hidden="true"></div>
       <div id="damageFlash" aria-hidden="true"></div>
       <div id="scorePopups" aria-hidden="true"></div>
       <div id="interactionPrompt" class="interactionPrompt hidden" aria-live="polite"></div>
+      <div id="statusMessage" class="statusMessage hidden" aria-live="polite"></div>
 
       <section id="startMessage" class="message">
         <div class="messagePanel">
@@ -38,14 +76,33 @@
             <li>Mouse: mirar</li>
             <li>Click: disparar</li>
             <li>R: recargar</li>
+            <li>E: interactuar</li>
+            <li>1/2: cambiar arma</li>
             <li>ESC o P: pausar o continuar</li>
           </ul>
           <button id="playButton" type="button">Jugar</button>
         </div>
       </section>
 
-      <section id="pauseMessage" class="centerNotice hidden" aria-live="polite">
-        <h2>Pausa</h2>
+      <section id="pauseMessage" class="message hidden" aria-live="polite">
+        <div class="messagePanel pausePanel">
+          <h1>PAUSA</h1>
+          <p>La partida esta detenida.</p>
+          <div class="pauseActions">
+            <button id="resumeButton" type="button">Continuar</button>
+            <button id="pauseRestartButton" type="button">Reiniciar partida</button>
+            <button id="mainMenuButton" type="button">Menu principal</button>
+          </div>
+          <ul class="controlsList">
+            <li>WASD mover</li>
+            <li>Mouse apuntar</li>
+            <li>Click disparar</li>
+            <li>R recargar</li>
+            <li>E interactuar</li>
+            <li>1/2 cambiar arma</li>
+            <li>P o Escape pausar</li>
+          </ul>
+        </div>
       </section>
 
       <section id="roundMessage" class="centerNotice hidden" aria-live="polite">

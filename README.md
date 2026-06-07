@@ -11,19 +11,28 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 - ESC o P para pausar o continuar.
 - R para recargar durante la partida.
 - E para interactuar con puertas o compras cercanas.
+- 1 y 2 para cambiar de arma.
 - R para reiniciar despues de perder.
 - Elimina todos los enemigos para pasar a la siguiente ronda.
 
 El juego guarda el puntaje maximo en `localStorage`, por lo que el record queda en el navegador donde se juega.
-Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
+La municion es finita: cada arma tiene cargador y reserva, y recargar transfiere balas desde la reserva.
 
 ## Modo survival y economia
 
 - Las rondas y transiciones viven en `src/gameMode.js`.
 - Los puntos viven en `src/economy.js`.
 - El jugador gana puntos por impacto y por eliminar zombies.
-- Los puntos se pueden gastar en una puerta comprable y una compra simple de municion.
+- Los puntos se pueden gastar en una estacion de municion y una estacion de arma.
+- La estacion de municion cuesta 250 puntos y rellena el arma activa.
+- La estacion de arma cuesta 750 puntos y compra/equipa el Rifle.
 - Las acciones locales pasan por `src/actions.js` y `src/multiplayer/localSession.js`, preparando el juego para multijugador futuro sin conectarse a ningun servidor todavia.
+
+## Armas
+
+- Pistola: arma inicial, 12 balas en cargador y reserva limitada.
+- Rifle: arma comprable, cargador de 30 balas y reserva mayor.
+- El HUD muestra arma activa, cargador, reserva y slots 1/2.
 
 ## Enemigos
 
@@ -34,7 +43,7 @@ Cada cargador tiene 8 balas y la recarga tarda 1.2 segundos.
 ## Power-ups
 
 - Curacion: recupera 25 puntos de vida sin superar el maximo.
-- Municion: rellena el cargador actual.
+- Municion: rellena la reserva y el cargador del arma activa.
 - Dano aumentado: los disparos hacen doble dano durante 8 segundos.
 
 Al terminar una ronda puede aparecer un power-up. Como maximo hay 2 activos y desaparecen si no se recogen a tiempo.
@@ -78,7 +87,7 @@ Luego visita `http://localhost:8000`.
 - `src/pathfinding.js`: grilla, conversion X/Z y rutas A*.
 - `src/weapons.js`: disparos, municion y recarga.
 - `src/powerUps.js`: aparicion y efectos de power-ups.
-- `src/interactables.js`: puerta comprable y estacion de compra.
+- `src/interactables.js`: estaciones de municion y arma.
 - `src/multiplayer/`: base local sin red para eventos y sesion futura.
 - `src/ui.js`: HUD, mensajes y feedback visual.
 - `src/utils.js`: funciones auxiliares.

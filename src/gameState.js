@@ -6,6 +6,7 @@
     MAX_AMMO,
     MAX_HEALTH,
     PLAYER_HEIGHT,
+    WEAPONS,
   } = window.ZR.config;
   const { getThree } = window.ZR.utils;
   const THREE = getThree();
@@ -27,6 +28,9 @@
         id: LOCAL_PLAYER_ID,
         health: MAX_HEALTH,
         points: 0,
+        activeWeaponId: "pistol",
+        weaponSlots: ["pistol", null],
+        weapons: {},
       },
     },
     yaw: 0,
@@ -42,6 +46,8 @@
     roundChanging: false,
     paused: false,
     ammo: MAX_AMMO,
+    ammoReserve: WEAPONS.pistol.reserveAmmo,
+    activeWeaponId: "pistol",
     reloading: false,
     reloadTimer: null,
     roundTimer: null,
@@ -50,6 +56,7 @@
     damageBoostActive: false,
     damageBoostTimer: null,
     damageFlashTimer: null,
+    statusMessageTimer: null,
     nextEnemyId: 1,
   };
 

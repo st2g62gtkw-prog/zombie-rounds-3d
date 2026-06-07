@@ -1,6 +1,5 @@
 (() => {
   const {
-    MAX_AMMO,
     MAX_HEALTH,
     PLAYER_HEIGHT,
   } = window.ZR.config;
@@ -48,7 +47,10 @@
     updateHud,
   } = window.ZR.ui;
   const { EVENTS } = window.ZR.protocol;
-  const { reloadAmmo } = window.ZR.weapons;
+  const {
+    reloadAmmo,
+    resetWeapons,
+  } = window.ZR.weapons;
   const {
     resetInteractables,
     updateInteractablePrompt,
@@ -69,6 +71,7 @@
     resumeGame,
     shoot: () => performAction({ type: EVENTS.SHOOT }),
     startGame,
+    switchWeapon: (slot) => performAction({ type: EVENTS.SWITCH_WEAPON, slot }),
   });
   window.addEventListener("resize", resizeRenderer);
   animate();
@@ -85,6 +88,7 @@
     clearDamageBoostTimer();
     hideDamageFlash();
     resetEconomy();
+    resetWeapons();
     resetInteractables();
     state.keys.clear();
     state.playerPosition.set(0, PLAYER_HEIGHT, 7);
@@ -92,14 +96,15 @@
     state.pitch = 0;
     state.health = MAX_HEALTH;
     state.players[state.localPlayerId].health = MAX_HEALTH;
-    state.ammo = MAX_AMMO;
     state.reloading = false;
     state.damageBoostActive = false;
     state.nextEnemyId = 1;
     resetGameMode(startNow);
     setPauseVisible(false);
     setGameOverVisible(false);
+    setInteractionPrompt("");
     setStartVisible(!startNow);
+    window.ZR.ui.showStatusMessage("");
 
     if (startNow) startRound(state.round);
 

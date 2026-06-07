@@ -1,5 +1,5 @@
 (() => {
-  const { MAX_AMMO } = window.ZR.config;
+  const { WEAPONS } = window.ZR.config;
   const {
     clearDamageFlashTimer,
     state,
@@ -15,14 +15,28 @@
     bestScoreValue: document.querySelector("#bestScoreValue"),
     ammoValue: document.querySelector("#ammoValue"),
     maxAmmoValue: document.querySelector("#maxAmmoValue"),
+    ammoReserveValue: document.querySelector("#maxAmmoValue"),
     reloadStatus: document.querySelector("#reloadStatus"),
     damageBoostValue: document.querySelector("#damageBoostValue"),
+    healthBar: document.querySelector("#healthBar"),
+    waveValue: document.querySelector("#waveValue"),
+    weaponNameValue: document.querySelector("#weaponNameValue"),
+    slot1: document.querySelector("#slot1"),
+    slot2: document.querySelector("#slot2"),
+    slot1Name: document.querySelector("#slot1Name"),
+    slot2Name: document.querySelector("#slot2Name"),
+    slot1Ammo: document.querySelector("#slot1Ammo"),
+    slot2Ammo: document.querySelector("#slot2Ammo"),
     damageFlash: document.querySelector("#damageFlash"),
     scorePopups: document.querySelector("#scorePopups"),
     interactionPrompt: document.querySelector("#interactionPrompt"),
+    statusMessage: document.querySelector("#statusMessage"),
     startMessage: document.querySelector("#startMessage"),
     gameOverMessage: document.querySelector("#gameOverMessage"),
     pauseMessage: document.querySelector("#pauseMessage"),
+    resumeButton: document.querySelector("#resumeButton"),
+    pauseRestartButton: document.querySelector("#pauseRestartButton"),
+    mainMenuButton: document.querySelector("#mainMenuButton"),
     roundMessage: document.querySelector("#roundMessage"),
     roundMessageText: document.querySelector("#roundMessageText"),
     playButton: document.querySelector("#playButton"),
@@ -33,20 +47,46 @@
   };
 
   function updateHud() {
+    const player = state.players[state.localPlayerId];
+    const weapon = player?.weapons?.[player.activeWeaponId] || null;
+
     elements.healthValue.textContent = Math.max(0, Math.ceil(state.health));
+    elements.healthBar.style.width = `${Math.max(0, Math.min(100, state.health))}%`;
     elements.roundValue.textContent = state.round;
+    elements.waveValue.textContent = state.round;
     elements.enemyValue.textContent = state.enemies.length;
     elements.scoreValue.textContent = state.score;
     elements.bestScoreValue.textContent = state.bestScore;
-    elements.ammoValue.textContent = state.ammo;
-    elements.maxAmmoValue.textContent = MAX_AMMO;
-    elements.reloadStatus.textContent = state.reloading ? " (recargando)" : "";
-    elements.damageBoostValue.textContent = state.damageBoostActive ? "x2" : "Normal";
+    elements.weaponNameValue.textContent = weapon?.name || "Sin arma";
+    elements.ammoValue.textContent = weapon?.ammoInMagazine ?? 0;
+    elements.ammoReserveValue.textContent = weapon?.reserveAmmo ?? 0;
+    elements.reloadStatus.textContent = state.reloading ? "Recargando... " : "";
+    elements.damageBoostValue.textContent = state.damageBoostActive ? "Dano x2" : "Dano normal";
+    updateWeaponSlots(player);
   }
 
   function setInteractionPrompt(text) {
     elements.interactionPrompt.textContent = text;
     elements.interactionPrompt.classList.toggle("hidden", !text);
+  }
+
+  function showStatusMessage(text, duration = 1400) {
+    elements.statusMessage.textContent = text;
+    elements.statusMessage.classList.toggle("hidden", !text);
+
+    if (state.statusMessageTimer) {
+      window.clearTimeout(state.statusMessageTimer);
+    }
+
+    if (!text) {
+      state.statusMessageTimer = null;
+      return;
+    }
+
+    state.statusMessageTimer = window.setTimeout(() => {
+      elements.statusMessage.classList.add("hidden");
+      state.statusMessageTimer = null;
+    }, duration);
   }
 
   function showDamageFlash() {
@@ -116,6 +156,20 @@
     setGameOverVisible(true);
   }
 
+  function updateWeaponSlots(player) {
+    updateSlot(elements.slot1, elements.slot1Name, elements.slot1Ammo, player, 0);
+    updateSlot(elements.slot2, elements.slot2Name, elements.slot2Ammo, player, 1);
+  }
+
+  function updateSlot(slotElement, nameElement, ammoElement, player, slotIndex) {
+    const weaponId = player?.weaponSlots?.[slotIndex] || null;
+    const weapon = weaponId ? player.weapons[weaponId] : null;
+
+    slotElement.classList.toggle("active", Boolean(weapon && player.activeWeaponId === weapon.id));
+    nameElement.textContent = weapon?.name || "Vacio";
+    ammoElement.textContent = weapon ? `${weapon.ammoInMagazine}/${weapon.reserveAmmo}` : "--";
+  }
+
   window.ZR.ui = {
     elements,
     hideDamageFlash,
@@ -129,6 +183,7 @@
     showDamageFlash,
     showGameOverStats,
     showScorePopup,
+    showStatusMessage,
     updateHud,
   };
 })();

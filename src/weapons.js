@@ -1,8 +1,5 @@
 (() => {
-  const {
-    MAX_AMMO,
-    RELOAD_TIME,
-  } = window.ZR.config;
+  const { WEAPONS } = window.ZR.config;
   const {
     clearReloadTimer,
     state,
@@ -14,47 +11,163 @@
   } = window.ZR.scene;
   const {
     elements,
+    showStatusMessage,
     updateHud,
   } = window.ZR.ui;
   const { getThree } = window.ZR.utils;
   const THREE = getThree();
 
-  function reloadAmmo() {
+  function resetWeapons(playerId = state.localPlayerId) {
+    const player = getPlayer(playerId);
+    player.weapons = {
+      pistol: createWeaponState("pistol"),
+    };
+    player.weaponSlots = ["pistol", null];
+    player.activeWeaponId = "pistol";
+    state.activeWeaponId = "pistol";
+    cancelReload();
+    syncLegacyAmmoState(player);
+  }
+
+  function createWeaponState(weaponId) {
+    const definition = WEAPONS[weaponId];
+    if (!definition) return null;
+
+    return {
+      id: definition.id,
+      name: definition.name,
+      damage: definition.damage,
+      fireRate: definition.fireRate,
+      magazineSize: definition.magazineSize,
+      ammoInMagazine: definition.magazineSize,
+      reserveAmmo: definition.reserveAmmo,
+      maxReserveAmmo: definition.maxReserveAmmo,
+      reloadTime: definition.reloadTime,
+      cost: definition.cost,
+      lastShotAt: -Infinity,
+    };
+  }
+
+  function getActiveWeapon(playerId = state.localPlayerId) {
+    const player = getPlayer(playerId);
+    return player.weapons[player.activeWeaponId] || null;
+  }
+
+  function getWeapon(weaponId, playerId = state.localPlayerId) {
+    return getPlayer(playerId).weapons[weaponId] || null;
+  }
+
+  function playerHasWeapon(weaponId, playerId = state.localPlayerId) {
+    return Boolean(getWeapon(weaponId, playerId));
+  }
+
+  function addWeapon(weaponId, playerId = state.localPlayerId) {
+    const player = getPlayer(playerId);
+    if (player.weapons[weaponId]) return player.weapons[weaponId];
+
+    const weapon = createWeaponState(weaponId);
+    if (!weapon) return null;
+
+    player.weapons[weaponId] = weapon;
+    const emptySlotIndex = player.weaponSlots.findIndex((slot) => !slot);
+    if (emptySlotIndex === -1) {
+      player.weaponSlots.push(weaponId);
+    } else {
+      player.weaponSlots[emptySlotIndex] = weaponId;
+    }
+
+    setActiveWeapon(weaponId, playerId);
+    return weapon;
+  }
+
+  function setActiveWeapon(weaponId, playerId = state.localPlayerId) {
+    const player = getPlayer(playerId);
+    if (!player.weapons[weaponId]) return false;
+
+    cancelReload();
+    player.activeWeaponId = weaponId;
+    state.activeWeaponId = weaponId;
+    syncLegacyAmmoState(player);
+    updateHud();
+    return true;
+  }
+
+  function switchWeapon(slotNumberOrId, playerId = state.localPlayerId) {
+    const player = getPlayer(playerId);
+    const weaponId = Number.isFinite(slotNumberOrId)
+      ? player.weaponSlots[slotNumberOrId - 1]
+      : slotNumberOrId;
+
+    if (!weaponId || weaponId === player.activeWeaponId) return false;
+    return setActiveWeapon(weaponId, playerId);
+  }
+
+  function reloadAmmo(playerId = state.localPlayerId) {
+    const weapon = getActiveWeapon(playerId);
+
     if (
+      !weapon ||
       !state.gameStarted ||
       state.gameOver ||
       state.paused ||
       state.reloading ||
-      state.ammo === MAX_AMMO
+      weapon.ammoInMagazine >= weapon.magazineSize ||
+      weapon.reserveAmmo <= 0
     ) {
-      return;
+      return false;
     }
 
+    const reloadWeaponId = weapon.id;
     state.reloading = true;
     updateHud();
 
     state.reloadTimer = window.setTimeout(() => {
-      state.ammo = MAX_AMMO;
+      const currentWeapon = getActiveWeapon(playerId);
+      if (!currentWeapon || currentWeapon.id !== reloadWeaponId) {
+        cancelReload();
+        updateHud();
+        return;
+      }
+
+      const neededAmmo = currentWeapon.magazineSize - currentWeapon.ammoInMagazine;
+      const loadedAmmo = Math.min(neededAmmo, currentWeapon.reserveAmmo);
+      currentWeapon.ammoInMagazine += loadedAmmo;
+      currentWeapon.reserveAmmo -= loadedAmmo;
       state.reloading = false;
       state.reloadTimer = null;
+      syncLegacyAmmoState(getPlayer(playerId));
       updateHud();
-    }, RELOAD_TIME);
+    }, weapon.reloadTime * 1000);
+
+    return true;
   }
 
   function shoot({ playerId = state.localPlayerId } = {}) {
+    const weapon = getActiveWeapon(playerId);
+    const now = performance.now();
+
     if (
+      !weapon ||
       !state.gameStarted ||
       state.gameOver ||
       state.paused ||
       state.reloading ||
       state.roundChanging ||
-      state.ammo <= 0 ||
       document.pointerLockElement !== elements.canvas
     ) {
-      return;
+      return false;
     }
 
-    state.ammo -= 1;
+    if (weapon.ammoInMagazine <= 0) {
+      showStatusMessage(weapon.reserveAmmo > 0 ? "Cargador vacio: presiona R" : "Sin municion");
+      return false;
+    }
+
+    if (now - weapon.lastShotAt < 1000 / weapon.fireRate) return false;
+
+    weapon.lastShotAt = now;
+    weapon.ammoInMagazine -= 1;
+    syncLegacyAmmoState(getPlayer(playerId));
     updateHud();
 
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
@@ -65,19 +178,18 @@
 
     drawShot(targetPoint);
 
-    if (!hits.length) return;
+    if (!hits.length) return true;
 
     const enemyGroup = hits[0].object.parent;
     const enemyIndex = state.enemies.findIndex((enemy) => enemy.mesh === enemyGroup);
-
-    if (enemyIndex === -1) return;
+    if (enemyIndex === -1) return true;
 
     const enemy = state.enemies[enemyIndex];
-    const damage = state.damageBoostActive ? 2 : 1;
+    const damage = state.damageBoostActive ? weapon.damage * 2 : weapon.damage;
 
     if (window.ZR.actions?.damageZombie) {
       window.ZR.actions.damageZombie(enemy, damage, playerId);
-      return;
+      return true;
     }
 
     enemy.health -= damage;
@@ -88,6 +200,45 @@
     }
 
     updateHud();
+    return true;
+  }
+
+  function buyWeaponAmmo(playerId = state.localPlayerId) {
+    const weapon = getActiveWeapon(playerId);
+    if (!weapon) return false;
+
+    weapon.reserveAmmo = weapon.maxReserveAmmo;
+
+    if (weapon.ammoInMagazine < weapon.magazineSize) {
+      const neededAmmo = weapon.magazineSize - weapon.ammoInMagazine;
+      const loadedAmmo = Math.min(neededAmmo, weapon.reserveAmmo);
+      weapon.ammoInMagazine += loadedAmmo;
+      weapon.reserveAmmo -= loadedAmmo;
+    }
+
+    syncLegacyAmmoState(getPlayer(playerId));
+    updateHud();
+    return true;
+  }
+
+  function refillAmmo(playerId = state.localPlayerId) {
+    return buyWeaponAmmo(playerId);
+  }
+
+  function cancelReload() {
+    clearReloadTimer();
+    state.reloading = false;
+  }
+
+  function syncLegacyAmmoState(player = getPlayer()) {
+    const weapon = player.weapons[player.activeWeaponId];
+    state.activeWeaponId = player.activeWeaponId;
+    state.ammo = weapon?.ammoInMagazine ?? 0;
+    state.ammoReserve = weapon?.reserveAmmo ?? 0;
+  }
+
+  function getPlayer(playerId = state.localPlayerId) {
+    return window.ZR.economy.getPlayer(playerId);
   }
 
   function drawShot(targetPoint) {
@@ -104,15 +255,18 @@
     }, 70);
   }
 
-  function refillAmmo() {
-    state.ammo = MAX_AMMO;
-    state.reloading = false;
-    clearReloadTimer();
-  }
-
   window.ZR.weapons = {
+    addWeapon,
+    buyWeaponAmmo,
+    cancelReload,
+    getActiveWeapon,
+    getWeapon,
+    playerHasWeapon,
     refillAmmo,
     reloadAmmo,
+    resetWeapons,
+    setActiveWeapon,
     shoot,
+    switchWeapon,
   };
 })();

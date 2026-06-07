@@ -14,6 +14,7 @@
     resumeGame,
     shoot,
     startGame,
+    switchWeapon,
   }) {
     document.addEventListener("keydown", (event) => {
       if (event.code === "Escape" || event.code === "KeyP") {
@@ -46,6 +47,16 @@
         return;
       }
 
+      if (event.code === "Digit1") {
+        switchWeapon(1);
+        return;
+      }
+
+      if (event.code === "Digit2") {
+        switchWeapon(2);
+        return;
+      }
+
       if (state.paused) return;
 
       state.keys.add(event.code);
@@ -72,6 +83,7 @@
     });
 
     document.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
       if (event.target === elements.playButton) return;
       if (event.target === elements.restartButton) return;
       if (state.gameOver || !state.gameStarted || state.paused) return;
@@ -93,6 +105,22 @@
       event.stopPropagation();
       resetGame(true);
       requestCanvasPointerLock();
+    });
+
+    elements.resumeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resumeGame();
+    });
+
+    elements.pauseRestartButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resetGame(true);
+      requestCanvasPointerLock();
+    });
+
+    elements.mainMenuButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      resetGame(false);
     });
   }
 
