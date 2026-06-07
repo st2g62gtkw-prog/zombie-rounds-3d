@@ -54,5 +54,18 @@ Luego visita `http://localhost:8000`.
 
 - `index.html`: estructura base del juego y HUD.
 - `style.css`: estilos de pantalla completa, HUD y mensajes.
-- `main.js`: escena Three.js, movimiento, disparos, enemigos y rondas.
+- `main.js`: puente de compatibilidad para cargar los scripts de `src/`.
+- `src/config.js`: constantes de juego.
+- `src/gameState.js`: estado mutable compartido.
+- `src/scene.js`: escena, camara, renderer y luces.
+- `src/map.js`: muros y obstaculos del mapa.
+- `src/collision.js`: colisiones simples contra mapa.
+- `src/player.js`: movimiento del jugador.
+- `src/input.js`: teclado, mouse y botones.
+- `src/zombies.js`: rondas, enemigos, IA y ataques.
+- `src/pathfinding.js`: grilla, conversion X/Z y rutas A*.
+- `src/weapons.js`: disparos, municion y recarga.
+- `src/powerUps.js`: aparicion y efectos de power-ups.
+- `src/ui.js`: HUD, mensajes y feedback visual.
+- `src/utils.js`: funciones auxiliares.
 - `README.md`: instrucciones del proyecto.
