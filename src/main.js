@@ -1,5 +1,6 @@
 (() => {
   const {
+    GAME_STATUS,
     MAX_AMMO,
     MAX_HEALTH,
     PLAYER_HEIGHT,
@@ -30,6 +31,7 @@
   const {
     elements,
     hideDamageFlash,
+    requestCanvasPointerLock,
     setGameOverVisible,
     setPauseVisible,
     setRoundMessageText,
@@ -65,7 +67,7 @@
 
   function startGame() {
     resetGame(true);
-    elements.canvas.requestPointerLock();
+    requestCanvasPointerLock();
   }
 
   function resetGame(startNow = false) {
@@ -97,6 +99,7 @@
     setStartVisible(!startNow);
 
     if (startNow) spawnRound(state.round);
+    setGameStatus(startNow ? GAME_STATUS.PLAYING : GAME_STATUS.MENU);
 
     updateHud();
     updateCamera();
@@ -108,6 +111,7 @@
     state.paused = true;
     state.lastPauseChange = performance.now();
     state.keys.clear();
+    setGameStatus(GAME_STATUS.PAUSED);
     setPauseVisible(true);
 
     if (document.pointerLockElement === elements.canvas) {
@@ -120,8 +124,9 @@
 
     state.paused = false;
     state.lastPauseChange = performance.now();
+    setGameStatus(state.roundChanging ? GAME_STATUS.ROUND_COMPLETE : GAME_STATUS.PLAYING);
     setPauseVisible(false);
-    elements.canvas.requestPointerLock();
+    requestCanvasPointerLock();
   }
 
   function damagePlayer(amount) {
@@ -137,12 +142,18 @@
   function endGame() {
     state.gameOver = true;
     state.gameStarted = false;
+    state.paused = false;
+    state.roundChanging = false;
     state.health = 0;
     clearReloadTimer();
+    clearRoundTimer();
     clearDamageBoostTimer();
     hideDamageFlash();
     state.reloading = false;
     state.damageBoostActive = false;
+    setGameStatus(GAME_STATUS.GAME_OVER);
+    setPauseVisible(false);
+    setRoundMessageVisible(false);
     updateBestScore();
     updateHud();
     showGameOverStats();
@@ -174,6 +185,7 @@
     if (state.roundChanging || state.enemies.length > 0 || state.gameOver) return;
 
     state.roundChanging = true;
+    setGameStatus(GAME_STATUS.ROUND_COMPLETE);
     maybeSpawnPowerUp();
     state.round += 1;
     setRoundMessageText(`Ronda ${state.round}`);
@@ -186,8 +198,13 @@
       setRoundMessageVisible(false);
       state.roundChanging = false;
       state.roundTimer = null;
+      if (!state.paused) setGameStatus(GAME_STATUS.PLAYING);
       updateHud();
     }, ROUND_MESSAGE_TIME);
+  }
+
+  function setGameStatus(status) {
+    state.status = status;
   }
 
   window.ZR.main = {

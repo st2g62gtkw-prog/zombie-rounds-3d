@@ -8,7 +8,7 @@ Juego web 3D simple hecho con HTML, CSS, JavaScript y Three.js. Esta version est
 - WASD para moverte.
 - Mueve el mouse para mirar.
 - Click para disparar.
-- ESC para pausar o continuar.
+- ESC o P para pausar o continuar.
 - R para recargar durante la partida.
 - R para reiniciar despues de perder.
 - Elimina todos los enemigos para pasar a la siguiente ronda.

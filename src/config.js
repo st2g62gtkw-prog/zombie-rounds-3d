@@ -11,6 +11,16 @@
     MAX_AMMO: 8,
     RELOAD_TIME: 1200,
     ROUND_MESSAGE_TIME: 1000,
+    GAME_STATUS: {
+      MENU: "menu",
+      PLAYING: "playing",
+      PAUSED: "paused",
+      GAME_OVER: "gameOver",
+      ROUND_COMPLETE: "roundComplete",
+    },
+    ROUND_BASE_ENEMIES: 3,
+    ROUND_ENEMY_GROWTH: 2,
+    ROUND_SPEED_BONUS: 0.09,
     POWER_UP_CHANCE: 0.65,
     MAX_POWER_UPS: 2,
     POWER_UP_DURATION: 14000,
@@ -24,7 +34,7 @@
     NAV_BLOCKED_RECALC_TIME: 0.55,
     NAV_WAYPOINT_REACH: 0.3,
     NAV_PATH_PADDING: 0.22,
-    NAV_DEBUG: true,
+    NAV_DEBUG: false,
     NAV_DEBUG_LINE_INTERVAL: 1500,
   };
 

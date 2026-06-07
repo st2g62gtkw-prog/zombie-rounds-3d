@@ -1,6 +1,7 @@
 (() => {
   const {
     BEST_SCORE_KEY,
+    GAME_STATUS,
     MAX_AMMO,
     MAX_HEALTH,
     PLAYER_HEIGHT,
@@ -21,6 +22,7 @@
     round: 1,
     score: 0,
     bestScore: loadBestScore(),
+    status: GAME_STATUS.MENU,
     gameStarted: false,
     gameOver: false,
     roundChanging: false,

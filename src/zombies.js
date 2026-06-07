@@ -10,6 +10,9 @@
     NAV_RECALC_TIME,
     NAV_WAYPOINT_REACH,
     PLAYER_RADIUS,
+    ROUND_BASE_ENEMIES,
+    ROUND_ENEMY_GROWTH,
+    ROUND_SPEED_BONUS,
     SPAWN_OBSTACLE_CLEARANCE,
   } = window.ZR.config;
   const { canOccupy } = window.ZR.collision;
@@ -33,7 +36,7 @@
   const THREE = getThree();
 
   function spawnRound(roundNumber) {
-    const amount = 3 + (roundNumber - 1) * 2;
+    const amount = ROUND_BASE_ENEMIES + (roundNumber - 1) * ROUND_ENEMY_GROWTH;
     const enemyTypes = buildRoundEnemyTypes(roundNumber, amount);
 
     for (const typeKey of enemyTypes) {
@@ -50,7 +53,7 @@
         radius: type.radius,
         health: type.health,
         points: type.points,
-        speed: type.speed + roundNumber * 0.09,
+        speed: type.speed + roundNumber * ROUND_SPEED_BONUS,
         lastAttack: 0,
         path: [],
         pathIndex: 0,

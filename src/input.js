@@ -2,6 +2,7 @@
   const { state } = window.ZR.gameState;
   const {
     elements,
+    requestCanvasPointerLock,
     setStartVisible,
   } = window.ZR.ui;
 
@@ -14,7 +15,7 @@
     startGame,
   }) {
     document.addEventListener("keydown", (event) => {
-      if (event.code === "Escape") {
+      if (event.code === "Escape" || event.code === "KeyP") {
         if (!state.gameStarted || state.gameOver) return;
         event.preventDefault();
 
@@ -69,7 +70,7 @@
       if (state.gameOver || !state.gameStarted || state.paused) return;
 
       if (document.pointerLockElement !== elements.canvas) {
-        elements.canvas.requestPointerLock();
+        requestCanvasPointerLock();
         return;
       }
 
@@ -84,7 +85,7 @@
     elements.restartButton.addEventListener("click", (event) => {
       event.stopPropagation();
       resetGame(true);
-      elements.canvas.requestPointerLock();
+      requestCanvasPointerLock();
     });
   }
 

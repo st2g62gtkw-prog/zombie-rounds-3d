@@ -94,6 +94,15 @@
     elements.gameOverMessage.classList.toggle("hidden", !visible);
   }
 
+  function requestCanvasPointerLock() {
+    try {
+      const lockRequest = elements.canvas.requestPointerLock();
+      if (lockRequest?.catch) lockRequest.catch(() => {});
+    } catch {
+      // Algunos navegadores de prueba bloquean pointer lock aunque el juego sea jugable.
+    }
+  }
+
   function showGameOverStats() {
     elements.finalRoundValue.textContent = state.round;
     elements.finalScoreValue.textContent = state.score;
@@ -104,6 +113,7 @@
   window.ZR.ui = {
     elements,
     hideDamageFlash,
+    requestCanvasPointerLock,
     setGameOverVisible,
     setPauseVisible,
     setRoundMessageText,
