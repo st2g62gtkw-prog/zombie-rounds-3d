@@ -229,7 +229,70 @@ body {
 }
 
 #damageFlash.active {
-  background: rgba(210, 45, 45, 0.24);
+  background: radial-gradient(circle, rgba(210, 45, 45, 0.05) 0 38%, rgba(210, 45, 45, 0.3) 100%);
+}
+
+#game.damageShake #gameCanvas {
+  animation: damageShake 170ms ease-out;
+}
+
+.hitmarker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hitmarker::before,
+.hitmarker::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 4px;
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.hitmarker::before {
+  transform: rotate(45deg);
+}
+
+.hitmarker::after {
+  transform: rotate(-45deg);
+}
+
+.hitmarker span {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  color: #ffd45c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.hitmarker.active {
+  animation: hitmarkerPulse 140ms ease-out;
+}
+
+.hitmarker.headshot::before,
+.hitmarker.headshot::after {
+  background: #ffd45c;
+  box-shadow: 0 0 12px rgba(255, 212, 92, 0.7);
+}
+
+.hitmarker:not(.headshot) span {
+  display: none;
 }
 
 #scorePopups {
@@ -296,6 +359,41 @@ body {
   }
 }
 
+@keyframes hitmarkerPulse {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+
+  42% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+
+  to {
+    opacity: 0.92;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes damageShake {
+  0% {
+    transform: translateX(0);
+  }
+
+  30% {
+    transform: translateX(-4px);
+  }
+
+  65% {
+    transform: translateX(3px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
 .centerNotice {
   position: fixed;
   inset: 0;
@@ -318,6 +416,7 @@ body {
   background: rgba(11, 14, 18, 0.78);
   font-size: clamp(30px, 7vw, 64px);
   letter-spacing: 0;
+  white-space: pre-line;
 }
 
 .message {

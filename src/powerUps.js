@@ -39,8 +39,12 @@
       const powerUp = state.powerUps[index];
       const powerUpFlat = new THREE.Vector3(powerUp.mesh.position.x, 0, powerUp.mesh.position.z);
 
-      powerUp.mesh.rotation.y += 0.04;
-      powerUp.mesh.position.y = 0.45 + Math.sin(now * 0.006 + index) * 0.08;
+      powerUp.mesh.rotation.y += 0.055;
+      powerUp.mesh.position.y = 0.52 + Math.sin(now * 0.006 + index) * 0.1;
+
+      if (powerUp.mesh.scale?.setScalar) {
+        powerUp.mesh.scale.setScalar(1 + Math.sin(now * 0.008 + index) * 0.08);
+      }
 
       if (now > powerUp.expiresAt) {
         removePowerUp(index);
@@ -49,6 +53,8 @@
 
       if (powerUpFlat.distanceTo(playerFlat) <= POWER_UP_PICKUP_RANGE) {
         applyPowerUp(powerUp.type);
+        window.ZR.ui.showStatusMessage("Boost activado");
+        window.ZR.audio?.play("boost");
         removePowerUp(index);
       }
     }
@@ -87,7 +93,7 @@
       new THREE.MeshStandardMaterial({
         color: type.color,
         emissive: type.color,
-        emissiveIntensity: 0.18,
+        emissiveIntensity: 0.55,
         roughness: 0.55,
       }),
     );
@@ -108,6 +114,8 @@
       type: type.key,
       expiresAt: performance.now() + POWER_UP_DURATION,
     });
+
+    window.ZR.ui.showStatusMessage("Boost aparecio");
   }
 
   function findDropPoint(sourcePosition) {

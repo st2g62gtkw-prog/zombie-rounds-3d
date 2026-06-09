@@ -121,9 +121,13 @@
 
     window.ZR.economy.addHitPoints(playerId);
     enemy.health -= amount;
+    window.ZR.ui.showHitmarker(Boolean(options.isHeadshot));
 
     if (options.isHeadshot) {
-      window.ZR.ui.showStatusMessage("Headshot", 900);
+      window.ZR.ui.showStatusMessage("HEADSHOT", 900);
+      window.ZR.audio?.play("headshot");
+    } else {
+      window.ZR.audio?.play("hit");
     }
 
     if (enemy.health <= 0) {

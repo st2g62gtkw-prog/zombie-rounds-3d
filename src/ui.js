@@ -25,6 +25,9 @@
     slot2: document.querySelector("#slot2"),
     slot1Name: document.querySelector("#slot1Name"),
     slot2Name: document.querySelector("#slot2Name"),
+    game: document.querySelector("#game"),
+    hitmarker: document.querySelector("#hitmarker"),
+    hitmarkerText: document.querySelector("#hitmarker span"),
     damageFlash: document.querySelector("#damageFlash"),
     scorePopups: document.querySelector("#scorePopups"),
     interactionPrompt: document.querySelector("#interactionPrompt"),
@@ -87,8 +90,37 @@
     }, duration);
   }
 
+  let hitmarkerTimer = null;
+  let damageShakeTimer = null;
+  let roundNoticeTimer = null;
+
+  function showHitmarker(isHeadshot = false) {
+    elements.hitmarker.classList.remove("hidden", "active", "headshot");
+    elements.hitmarkerText.textContent = isHeadshot ? "HEADSHOT" : "";
+
+    if (hitmarkerTimer) {
+      window.clearTimeout(hitmarkerTimer);
+    }
+
+    if (isHeadshot) {
+      elements.hitmarker.classList.add("headshot");
+    }
+
+    // Reinicia la animacion aunque el rifle impacte muy rapido.
+    void elements.hitmarker.offsetWidth;
+    elements.hitmarker.classList.add("active");
+
+    hitmarkerTimer = window.setTimeout(() => {
+      elements.hitmarker.classList.add("hidden");
+      elements.hitmarker.classList.remove("active", "headshot");
+      elements.hitmarkerText.textContent = "";
+      hitmarkerTimer = null;
+    }, isHeadshot ? 260 : 150);
+  }
+
   function showDamageFlash() {
     elements.damageFlash.classList.add("active");
+    elements.game.classList.add("damageShake");
 
     if (state.damageFlashTimer) {
       window.clearTimeout(state.damageFlashTimer);
@@ -98,11 +130,46 @@
       elements.damageFlash.classList.remove("active");
       state.damageFlashTimer = null;
     }, 180);
+
+    if (damageShakeTimer) {
+      window.clearTimeout(damageShakeTimer);
+    }
+
+    damageShakeTimer = window.setTimeout(() => {
+      elements.game.classList.remove("damageShake");
+      damageShakeTimer = null;
+    }, 190);
   }
 
   function hideDamageFlash() {
     clearDamageFlashTimer();
     elements.damageFlash.classList.remove("active");
+    elements.game.classList.remove("damageShake");
+
+    if (damageShakeTimer) {
+      window.clearTimeout(damageShakeTimer);
+      damageShakeTimer = null;
+    }
+  }
+
+  function clearTransientFeedback() {
+    hideDamageFlash();
+
+    if (hitmarkerTimer) {
+      window.clearTimeout(hitmarkerTimer);
+      hitmarkerTimer = null;
+    }
+
+    elements.hitmarker.classList.add("hidden");
+    elements.hitmarker.classList.remove("active", "headshot");
+    elements.hitmarkerText.textContent = "";
+
+    if (roundNoticeTimer) {
+      window.clearTimeout(roundNoticeTimer);
+      roundNoticeTimer = null;
+    }
+
+    elements.roundMessage.classList.add("hidden");
   }
 
   function showScorePopup(points) {
@@ -123,11 +190,30 @@
   }
 
   function setRoundMessageVisible(visible) {
+    if (!visible && roundNoticeTimer) {
+      window.clearTimeout(roundNoticeTimer);
+      roundNoticeTimer = null;
+    }
+
     elements.roundMessage.classList.toggle("hidden", !visible);
   }
 
   function setRoundMessageText(text) {
     elements.roundMessageText.textContent = text;
+  }
+
+  function showRoundNotice(text, duration = 900) {
+    elements.roundMessageText.textContent = text;
+    elements.roundMessage.classList.remove("hidden");
+
+    if (roundNoticeTimer) {
+      window.clearTimeout(roundNoticeTimer);
+    }
+
+    roundNoticeTimer = window.setTimeout(() => {
+      elements.roundMessage.classList.add("hidden");
+      roundNoticeTimer = null;
+    }, duration);
   }
 
   function setStartVisible(visible) {
@@ -168,6 +254,7 @@
   }
 
   window.ZR.ui = {
+    clearTransientFeedback,
     elements,
     hideDamageFlash,
     requestCanvasPointerLock,
@@ -179,6 +266,8 @@
     setStartVisible,
     showDamageFlash,
     showGameOverStats,
+    showHitmarker,
+    showRoundNotice,
     showScorePopup,
     showStatusMessage,
     updateHud,

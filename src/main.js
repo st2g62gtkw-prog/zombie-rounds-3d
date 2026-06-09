@@ -42,6 +42,7 @@
     setPauseVisible,
     setRoundMessageVisible,
     setStartVisible,
+    clearTransientFeedback,
     showDamageFlash,
     showGameOverStats,
     updateHud,
@@ -87,7 +88,8 @@
     clearPowerUps();
     clearReloadTimer();
     clearDamageBoostTimer();
-    hideDamageFlash();
+    clearTransientFeedback();
+    window.ZR.audio?.resetAudioThrottle();
     resetEconomy();
     resetWeapons();
     resetInteractables();
@@ -140,6 +142,7 @@
     state.health = Math.max(0, state.health - amount);
     state.players[state.localPlayerId].health = state.health;
     showDamageFlash();
+    window.ZR.audio?.play("damage");
     updateHud();
 
     if (state.health <= 0) {

@@ -52,7 +52,9 @@ Al eliminar un zombie existe una probabilidad baja de que deje un power-up. Como
 
 ## Presentacion
 
-El mapa usa suelo, muros, pocos obstaculos grandes y una plataforma elevada de prueba con dos rampas. La plataforma tiene superficies caminables con altura y laterales solidos simples. Al recibir dano aparece un flash breve y al eliminar enemigos se muestra el puntaje ganado.
+El mapa usa suelo, muros, pocos obstaculos grandes y una plataforma elevada de prueba con dos rampas. La plataforma tiene superficies caminables con altura y laterales solidos simples. Al recibir dano aparece un flash breve con shake suave, los impactos muestran hitmarker y los headshots muestran un aviso corto. Los boosts tienen brillo, pulso y rotacion para verse mejor.
+
+Los sonidos son simples y generados por codigo con Web Audio API, sin archivos externos. Si el navegador bloquea audio, el juego sigue funcionando normalmente.
 
 ## Ejecutar localmente
 
@@ -92,5 +94,6 @@ Luego visita `http://localhost:8000`.
 - `src/interactables.js`: estaciones de municion y arma.
 - `src/multiplayer/`: base local sin red para eventos y sesion futura.
 - `src/ui.js`: HUD, mensajes y feedback visual.
+- `src/audio.js`: sonidos simples generados por codigo.
 - `src/utils.js`: funciones auxiliares.
 - `README.md`: instrucciones del proyecto.

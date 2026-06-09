@@ -127,15 +127,24 @@
       !state.gameStarted ||
       state.gameOver ||
       state.paused ||
-      state.reloading ||
-      weapon.ammoInMagazine >= weapon.magazineSize ||
-      weapon.reserveAmmo <= 0
+      state.reloading
     ) {
+      return false;
+    }
+
+    if (weapon.ammoInMagazine >= weapon.magazineSize) {
+      showStatusMessage("Cargador lleno");
+      return false;
+    }
+
+    if (weapon.reserveAmmo <= 0) {
+      showStatusMessage("Sin municion de reserva");
       return false;
     }
 
     const reloadWeaponId = weapon.id;
     state.reloading = true;
+    showStatusMessage("Recargando...", Math.max(700, weapon.reloadTime * 1000));
     updateHud();
 
     state.reloadTimer = window.setTimeout(() => {
@@ -154,6 +163,7 @@
       state.reloadTimer = null;
       syncLegacyAmmoState(getPlayer(playerId));
       updateHud();
+      window.ZR.audio?.play("reload");
     }, weapon.reloadTime * 1000);
 
     return true;
@@ -186,6 +196,7 @@
     weapon.ammoInMagazine -= 1;
     syncLegacyAmmoState(getPlayer(playerId));
     updateHud();
+    window.ZR.audio?.play("shoot");
 
     raycaster.setFromCamera({ x: 0, y: 0 }, camera);
 

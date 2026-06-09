@@ -12,6 +12,7 @@
   const {
     setRoundMessageText,
     setRoundMessageVisible,
+    showRoundNotice,
     updateHud,
   } = window.ZR.ui;
 
@@ -20,7 +21,7 @@
     state.round = 1;
     state.roundChanging = false;
     state.pendingRoundStart = false;
-    setRoundMessageText("Ronda 1");
+    setRoundMessageText("RONDA 1");
     setRoundMessageVisible(false);
     setStatus(startNow ? GAME_STATUS.PLAYING : GAME_STATUS.MENU);
   }
@@ -29,8 +30,9 @@
     clearRoundTimer();
     state.round = roundNumber;
     state.roundChanging = false;
-    setRoundMessageVisible(false);
+    showRoundNotice(`RONDA ${roundNumber}`, 850);
     window.ZR.zombies.spawnRound(roundNumber, getZombieCountForRound(roundNumber));
+    window.ZR.audio?.play("round");
     setStatus(GAME_STATUS.PLAYING);
     updateHud();
   }
@@ -54,8 +56,7 @@
     state.roundChanging = true;
     setStatus(GAME_STATUS.ROUND_TRANSITION);
     state.round += 1;
-    setRoundMessageText(`Ronda ${state.round}`);
-    setRoundMessageVisible(true);
+    showRoundNotice(`RONDA COMPLETADA\nRONDA ${state.round}`, ROUND_MESSAGE_TIME);
     updateHud();
 
     state.roundTimer = window.setTimeout(() => {
